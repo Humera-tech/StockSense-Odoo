@@ -302,7 +302,7 @@ StockSense-Odoo/
     └── schemas/                 # Pydantic schemas
 ```
 
-> **Current state:** The `frontend/` scaffold is in place. Most page and component files are stubs awaiting implementation. The `server/` directory does not yet exist in the repository.
+> **Current state:** Backend API, stock engine (receipts, deliveries with reservations/Waiting, cancel), seed data, and the frontend auth, receipts, deliveries, stock and settings screens are implemented. Adjustments, dashboard counts and move history are next.
 
 ---
 
@@ -321,26 +321,32 @@ npm run dev
 
 Frontend dev server: `http://localhost:5173`
 
-### Backend (planned)
+### Backend
 
 ```bash
-# Copy environment variables
-cp .env.example .env
-
-# Start PostgreSQL
-docker-compose up -d
+# Start PostgreSQL (from the repo root)
+docker compose up -d
 
 # Install, migrate, seed, run
 cd server
+python -m venv .venv
+.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env
 alembic upgrade head
-python seed.py
-uvicorn main:app --reload
+python -m app.seed
+uvicorn app.main:app --reload
 ```
 
-API + Swagger UI: `http://localhost:8000/docs`
+API + Swagger UI: `http://localhost:8000/docs` · Demo login: **`admin01` / `Admin@1234`**
 
-> **SQLite fallback:** Set `DATABASE_URL=sqlite:///./stocksense.db` in `.env` if Docker is unavailable.
+The frontend dev server proxies `/api` to `localhost:8000`, so start the backend first.
+
+> **SQLite fallback:** Set `DATABASE_URL=sqlite:///./stocksense.db` in `server/.env` if Docker is unavailable.
+
+> **Reset demo data:** `alembic downgrade base && alembic upgrade head && python -m app.seed`
+
+> **Tests:** `cd server && pytest`
 
 ---
 
