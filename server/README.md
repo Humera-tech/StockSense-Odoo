@@ -1,6 +1,6 @@
 # StockSense API (server)
 
-FastAPI backend for StockSense — auth, master data, operations (receipts/deliveries), stock engine
+FastAPI backend for StockSense — auth, master data, operations (receipts/deliveries), stock engine.
 
 ## Setup
 
