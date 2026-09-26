@@ -395,7 +395,7 @@ _Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of 
 
 ### Remaining — by person
 
-**Hamza — stock engine & queries** (`server/app/services/stock.py`, tests in `server/tests/`)
+**Backend — stock engine & queries** (`server/app/services/stock.py`, tests in `server/tests/`)
 
 | When | Task |
 |------|------|
@@ -405,7 +405,7 @@ _Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of 
 | 14:30–15:30 | Guards for adjustments + tests; run the engine tests against Postgres. (Negative stock, double validate and edit-after-Done guards are already done and tested.) |
 | 15:30–17:00 | Bug fixes from QA; review backend changes; final merges. |
 
-**Mahreen — FastAPI layer** (`server/app/api/routes/`, `server/app/schemas/`)
+**Backend — FastAPI layer** (`server/app/api/routes/`, `server/app/schemas/`)
 
 | When | Task |
 |------|------|
@@ -415,7 +415,7 @@ _Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of 
 | 14:30–15:30 | Edge-case validation pass on every endpoint; API tests for the new endpoints in `tests/test_api.py`. (Error shape, auth on every route and list search filters are done.) |
 | 15:30–17:00 | Bug fixes from QA; final merges. |
 
-**Asad — frontend operations screens** (`frontend/src/`)
+**Frontend — operations screens** (`frontend/src/`)
 
 | When | Task |
 |------|------|
@@ -423,9 +423,9 @@ _Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of 
 | 14:30–15:30 | **Move History** (`pages/operations/MoveHistory.tsx`): one row per product line, IN green / OUT red, list + kanban + search, from `GET /api/moves`. Add it to the top menu (`components/layout/Header.tsx`) and routes (`routes/AppRoutes.tsx`). |
 | 14:30–15:30 | **Print view** for Done receipts/deliveries: a proper printable layout (Print currently calls `window.print()` with the menu hidden). |
 | 15:30–16:20 | Visual consistency and kanban polish. |
-| 16:20–17:00 | Final walkthrough. **Push your own commits**: no commits from Asad on `main` yet. |
+| 16:20–17:00 | Final walkthrough. |
 
-**Lateef — stock UI, QA & release** (`frontend/src/`, repo root)
+**Frontend support — stock UI, QA & release** (`frontend/src/`, repo root)
 
 | When | Task |
 |------|------|
@@ -442,24 +442,24 @@ _Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of 
 |----------|---------|--------|-------|
 | P0 | Login / Sign up with rules | ✅ | — |
 | P0 | Warehouse + Location settings | ✅ | — |
-| P0 | Products & stock page | ✅ view + new product · ⏳ editable cells | Lateef |
+| P0 | Products & stock page | ✅ view + new product · ⏳ editable cells | Frontend |
 | P0 | Receipts (list, form, Draft → Ready → Done) | ✅ | — |
 | P0 | Deliveries (Draft → Waiting → Ready → Done) | ✅ | — |
 | P0 | Auto references `WH/IN/0001` | ✅ | — |
 | P0 | Stock updates on Validate | ✅ | — |
-| P0 | Move History list | ⏳ | Hamza (query) · Mahreen (API) · Asad (UI) |
-| P0 | Dashboard cards | ⏳ placeholder | Hamza (query) · Mahreen (API) · Asad (UI) |
-| P1 | Kanban toggle by status | ✅ Receipts/Deliveries · ⏳ Move History | Asad |
+| P0 | Move History list | ⏳ | Backend (query) · Backend (API) · Frontend (UI) |
+| P0 | Dashboard cards | ⏳ placeholder | Backend (query) · Backend (API) · Frontend (UI) |
+| P1 | Kanban toggle by status | ✅ Receipts/Deliveries · ⏳ Move History | Frontend |
 | P1 | Search by reference & contact | ✅ | — |
 | P1 | Out-of-stock red line + alert | ✅ | — |
-| P1 | Print receipt when Done | ✅ basic · ⏳ print layout | Asad |
-| P1 | Adjustments | ⏳ | Hamza (engine) · Mahreen (API) · Lateef (UI) |
-| P1 | Late / Waiting counts | ✅ in lists · ⏳ on dashboard | Asad |
-| P1 | Green IN / red OUT in history | ⏳ | Asad |
+| P1 | Print receipt when Done | ✅ basic · ⏳ print layout | Frontend |
+| P1 | Adjustments | ⏳ | Backend (engine) · Backend (API) · Frontend (UI) |
+| P1 | Late / Waiting counts | ✅ in lists · ⏳ on dashboard | Frontend |
+| P1 | Green IN / red OUT in history | ⏳ | Frontend |
 | P1 | Forgot password | ✅ OTP reset (code shown on screen in offline demo mode) | — |
 | P2 | Low-stock highlight | ✅ out-of-stock rows red | — |
-| P2 | CSV export of history | ⏳ stretch, only if P0/P1 are done by 15:30 | Mahreen (endpoint) · Asad (button) |
-| P2 | Dark mode | ⏳ stretch | Asad |
+| P2 | CSV export of history | ⏳ stretch, only if P0/P1 are done by 15:30 | Backend (endpoint) · Frontend (button) |
+| P2 | Dark mode | ⏳ stretch | Frontend |
 | P2 | Cancel flow polish | ✅ cancel with confirm + reservation release | — |
 
 **Demo script blockers:** step 3 (edit On Hand → adjustment in Move History), step 6 (Move History) and step 7 (live Dashboard) need the remaining items above. Steps 1, 2, 4 and 5 work today.
@@ -470,12 +470,12 @@ _Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of 
 
 | Member | Role | Owns | Branches |
 |--------|------|------|----------|
-| **Hamza** | Backend — Data & Stock Engine | SQLAlchemy models, Alembic migrations, sequence generator, stock engine (`create / todo / validate / cancel`, reservations, Waiting re-check, adjustments), move ledger, dashboard queries, pytest | `feat/models` · `feat/stock-engine` · `feat/dashboard-queries` |
-| **Mahreen** | Backend — FastAPI Layer | FastAPI app structure, routers, Pydantic schemas, auth (signup/login/JWT/forgot), master-data CRUD, operations/moves/dashboard/stock endpoints, CORS, error format | `feat/api-skeleton` · `feat/auth-api` · `feat/master-data-api` · `feat/operations-api` |
-| **Asad** | Frontend | Theme tokens, layout shell, reusable `OperationList` (list + kanban + search), Receipt & Delivery forms, line editor, red-line alert, Dashboard, Move History, print view, responsive pass | `feat/ui-shell` · `feat/operation-list` · `feat/operation-form` · `feat/dashboard-ui` · `feat/move-history` |
-| **Lateef** | Deployment + Frontend Support | Repo setup, branch protection, docker-compose, `.env.example`, seed script, README, QA. Builds simpler screens (~10:30 onwards): Login/Sign up/Forgot password UI, Settings (warehouse, location), Stock page | `chore/repo-setup` · `chore/docker` · `chore/seed` · `feat/auth-ui` · `feat/settings-ui` · `feat/stock-ui` · `docs/readme` |
+| **Backend 1** | Backend — Data & Stock Engine | SQLAlchemy models, Alembic migrations, sequence generator, stock engine (`create / todo / validate / cancel`, reservations, Waiting re-check, adjustments), move ledger, dashboard queries, pytest | `feat/models` · `feat/stock-engine` · `feat/dashboard-queries` |
+| **Backend 2** | Backend — FastAPI Layer | FastAPI app structure, routers, Pydantic schemas, auth (signup/login/JWT/forgot), master-data CRUD, operations/moves/dashboard/stock endpoints, CORS, error format | `feat/api-skeleton` · `feat/auth-api` · `feat/master-data-api` · `feat/operations-api` |
+| **Frontend 1** | Frontend | Theme tokens, layout shell, reusable `OperationList` (list + kanban + search), Receipt & Delivery forms, line editor, red-line alert, Dashboard, Move History, print view, responsive pass | `feat/ui-shell` · `feat/operation-list` · `feat/operation-form` · `feat/dashboard-ui` · `feat/move-history` |
+| **Frontend 2** | Deployment + Frontend Support | Repo setup, branch protection, docker-compose, `.env.example`, seed script, README, QA. Builds simpler screens (~10:30 onwards): Login/Sign up/Forgot password UI, Settings (warehouse, location), Stock page | `chore/repo-setup` · `chore/docker` · `chore/seed` · `feat/auth-ui` · `feat/settings-ui` · `feat/stock-ui` · `docs/readme` |
 
-**Backend contract:** Hamza exposes plain Python functions in `services/stock.py` (e.g. `validate_operation(db, op_id, user)`) that raise typed errors. Mahreen's routers parse/validate input, call these functions, and map errors to HTTP responses. Neither edits the other's files.
+**Backend contract:** The stock-engine owner exposes plain Python functions in `services/stock.py` (e.g. `validate_operation(db, op_id, user)`) that raise typed errors. The API layer's routers parse/validate input, call these functions, and map errors to HTTP responses. Neither edits the other's files.
 
 ---
 
@@ -485,7 +485,7 @@ _Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of 
 - Each task = `feat/*` branch → PR → one review → merge (squash-free; individual commits kept visible).
 - Commit small and often: `feat(stock): reserve qty on delivery todo`
 - Target **10+ commits per person** — contributor graphs are a judged criterion.
-- **Model changes only via Alembic migrations**, owned exclusively by Hamza.
+- **Model changes only via Alembic migrations**, owned exclusively by the stock-engine owner.
 - **Merge windows:** 11:00 · 12:30 · 14:30 · 15:30 · 16:20 — rebase on `main` after each.
 - **Feature freeze: 16:20.** Tag `v1.0`, submit by 16:50.
 
@@ -499,5 +499,5 @@ _Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of 
 - [x] All sign-up/login rules enforced server-side with clear error messages
 - [ ] List + kanban + search on Receipts, Deliveries, and Move History: Move History missing
 - [x] Responsive at 375 px, one consistent color scheme (built screens verified)
-- [ ] README with setup steps, stack, and schema; fresh clone runs in under 5 minutes: Lateef to verify at 16:20
-- [ ] Commits from all team members: Asad has none yet
+- [ ] README with setup steps, stack, and schema; fresh clone runs in under 5 minutes: to verify at 16:20
+- [ ] Commits from all team members
