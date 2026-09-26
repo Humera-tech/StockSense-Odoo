@@ -2,7 +2,7 @@
 
 > **Odoo × GCET Hyderabad Hackathon 2026**  
 > Virtual Round · 26 Sep 2026 · 9:00 AM – 5:00 PM IST  
-> Repository: https://github.com/Humera-tech/StockSense-Odoo
+> **Live Demo:** https://stocksense-frontend-bcik.onrender.com
 
 ---
 
