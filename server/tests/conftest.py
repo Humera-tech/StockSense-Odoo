@@ -42,14 +42,15 @@ def seed(db: Session) -> SimpleNamespace:
     stock1 = Location(name="Stock 1", short_code="Stock1", warehouse_id=wh.id, type=LocationType.INTERNAL)
     vendor = Location(name="Vendors", short_code="VENDOR", warehouse_id=wh.id, type=LocationType.VENDOR)
     customer = Location(name="Customers", short_code="CUSTOMER", warehouse_id=wh.id, type=LocationType.CUSTOMER)
+    adjust = Location(name="Inventory adjustment", short_code="ADJUST", warehouse_id=wh.id, type=LocationType.ADJUSTMENT)
     contact = Contact(name="Azure Interior", kind=ContactKind.VENDOR)
     desk = Product(sku="DESK001", name="Desk", unit_cost=3000, uom="unit")
     chair = Product(sku="CHAIR001", name="Chair", unit_cost=800, uom="unit")
-    db.add_all([stock1, vendor, customer, contact, desk, chair])
+    db.add_all([stock1, vendor, customer, adjust, contact, desk, chair])
     db.commit()
 
     return SimpleNamespace(
-        user=user, wh=wh, stock1=stock1, vendor=vendor, customer=customer,
+        user=user, wh=wh, stock1=stock1, vendor=vendor, customer=customer, adjust=adjust,
         contact=contact, desk=desk, chair=chair,
     )
 

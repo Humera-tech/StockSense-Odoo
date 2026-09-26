@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import (
     Contact,
@@ -394,3 +394,135 @@ def cancel_operation(db: Session, op_id: int) -> Operation:
         raise
     db.refresh(op)
     return op
+
+
+def adjust_stock(
+    db: Session,
+    *,
+    product_id: int,
+    location_id: int,
+    counted_qty: int,
+    responsible_id: int,
+) -> Operation | None:
+    """Post the difference between counted and on-hand stock as a Done ADJ operation; None if nothing changed."""
+    if isinstance(counted_qty, bool) or not isinstance(counted_qty, int):
+        raise StockError("Quantity must be a whole number", field="counted_qty")
+    if counted_qty < 0:
+        raise StockError("Quantity cannot be negative", field="counted_qty")
+    if db.get(Product, product_id) is None:
+        raise NotFoundError("Product not found", field="product_id")
+    location = db.get(Location, location_id)
+    if location is None or location.type != LocationType.INTERNAL:
+        raise StockError("Stock can only be counted in an internal location", field="location_id")
+    adjustment_location = db.scalar(
+        select(Location).where(
+            Location.warehouse_id == location.warehouse_id, Location.type == LocationType.ADJUSTMENT
+        )
+    )
+    if adjustment_location is None:
+        raise StockError("Warehouse has no inventory adjustment location", field="location_id")
+
+    try:
+        quant = _lock_quant(db, product_id, location_id)
+        diff = counted_qty - quant.quantity
+        if diff == 0:
+            db.rollback()
+            return None
+        reserved = reserved_qty(db, product_id, location_id)
+        if counted_qty < reserved:
+            raise StockError(
+                f"{reserved} units are reserved by deliveries here; cancel those or count at least {reserved}",
+                field="counted_qty",
+            )
+
+        src, dest = (adjustment_location, location) if diff > 0 else (location, adjustment_location)
+        op = Operation(
+            reference=next_reference(db, location.warehouse, OperationType.ADJ),
+            type=OperationType.ADJ,
+            warehouse_id=location.warehouse_id,
+            src_location_id=src.id,
+            dest_location_id=dest.id,
+            scheduled_date=date.today(),
+            status=OperationStatus.DONE,
+            done_at=datetime.now(),
+            responsible_id=responsible_id,
+            lines=[OperationLine(product_id=product_id, quantity=abs(diff), reserved_qty=0)],
+        )
+        db.add(op)
+        db.flush()
+        db.add(
+            StockMove(
+                operation_id=op.id,
+                reference=op.reference,
+                product_id=product_id,
+                from_location_id=src.id,
+                to_location_id=dest.id,
+                quantity=abs(diff),
+            )
+        )
+        quant.quantity = counted_qty
+        if diff > 0:
+            _recheck_waiting(db, location_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(op)
+    return op
+
+
+def list_moves(db: Session, q: str | None = None, op_type: OperationType | None = None) -> list[StockMove]:
+    query = (
+        select(StockMove)
+        .join(Operation, StockMove.operation_id == Operation.id)
+        .join(Product, StockMove.product_id == Product.id)
+        .outerjoin(Contact, Operation.contact_id == Contact.id)
+        .options(
+            selectinload(StockMove.product),
+            selectinload(StockMove.from_location).selectinload(Location.warehouse),
+            selectinload(StockMove.to_location).selectinload(Location.warehouse),
+            selectinload(StockMove.operation).selectinload(Operation.contact),
+        )
+        .order_by(StockMove.date.desc(), StockMove.id.desc())
+    )
+    if op_type is not None:
+        query = query.where(Operation.type == op_type)
+    if q:
+        pattern = f"%{q.strip()}%"
+        query = query.where(
+            or_(
+                StockMove.reference.ilike(pattern),
+                Contact.name.ilike(pattern),
+                Product.name.ilike(pattern),
+                Product.sku.ilike(pattern),
+            )
+        )
+    return list(db.scalars(query))
+
+
+def dashboard_counts(db: Session, today: date | None = None) -> dict:
+    today = today or date.today()
+    open_statuses = (OperationStatus.DRAFT, OperationStatus.WAITING, OperationStatus.READY)
+
+    def count(op_type: OperationType, *conditions) -> int:
+        return db.scalar(select(func.count(Operation.id)).where(Operation.type == op_type, *conditions)) or 0
+
+    def late(op_type: OperationType) -> int:
+        return count(op_type, Operation.status.in_(open_statuses), Operation.scheduled_date < today)
+
+    def upcoming(op_type: OperationType) -> int:
+        return count(op_type, Operation.status.in_(open_statuses), Operation.scheduled_date > today)
+
+    return {
+        "receipts": {
+            "toReceive": count(OperationType.IN, Operation.status == OperationStatus.READY),
+            "late": late(OperationType.IN),
+            "operations": upcoming(OperationType.IN),
+        },
+        "deliveries": {
+            "toDeliver": count(OperationType.OUT, Operation.status == OperationStatus.READY),
+            "late": late(OperationType.OUT),
+            "waiting": count(OperationType.OUT, Operation.status == OperationStatus.WAITING),
+            "operations": upcoming(OperationType.OUT),
+        },
+    }
