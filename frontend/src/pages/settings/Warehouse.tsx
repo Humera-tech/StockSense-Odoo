@@ -63,7 +63,7 @@ export default function Warehouse() {
           <div className="card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[480px] text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <thead className="border-b border-line bg-subtle text-xs font-semibold uppercase tracking-wide text-muted">
                   <tr>
                     <th className="px-4 py-3">Short code</th>
                     <th className="px-4 py-3">Name</th>
@@ -71,14 +71,14 @@ export default function Warehouse() {
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line">
                   {warehouses?.map((w) => (
                     <tr key={w.id}>
-                      <td className="px-4 py-3 font-semibold text-slate-900">{w.short_code}</td>
-                      <td className="px-4 py-3 text-slate-700">{w.name}</td>
-                      <td className="px-4 py-3 text-slate-500">{w.address ?? "—"}</td>
+                      <td className="px-4 py-3 font-semibold text-ink">{w.short_code}</td>
+                      <td className="px-4 py-3 text-ink/80">{w.name}</td>
+                      <td className="px-4 py-3 text-muted">{w.address ?? "—"}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <button type="button" onClick={() => startEdit(w)} className="mr-3 font-semibold text-indigo-600 hover:text-indigo-700">Edit</button>
+                        <button type="button" onClick={() => startEdit(w)} className="mr-3 font-semibold text-brand hover:text-brand">Edit</button>
                         <button type="button" onClick={() => remove(w)} className="font-semibold text-rose-600 hover:text-rose-700">Delete</button>
                       </td>
                     </tr>
@@ -91,7 +91,7 @@ export default function Warehouse() {
         </div>
 
         <form onSubmit={save} noValidate className="card h-fit space-y-4 p-5">
-          <h2 className="text-base font-semibold text-slate-900">{editing ? `Edit ${editing.short_code}` : "New warehouse"}</h2>
+          <h2 className="text-base font-semibold text-ink">{editing ? `Edit ${editing.short_code}` : "New warehouse"}</h2>
           <Field label="Name" htmlFor="wh-name" error={errors.name}>
             <input id="wh-name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               placeholder="Main Warehouse" className={`input ${errors.name ? "input-invalid" : ""}`} />
@@ -106,7 +106,7 @@ export default function Warehouse() {
               onChange={(e) => setDraft({ ...draft, address: e.target.value })} className="input" />
           </Field>
           {!editing && (
-            <p className="text-xs text-slate-500">A default “Stock” location plus vendor, customer and adjustment locations are created with it.</p>
+            <p className="text-xs text-muted">A default “Stock” location plus vendor, customer and adjustment locations are created with it.</p>
           )}
           <div className="flex gap-2">
             <button type="submit" className="btn btn-primary">{editing ? "Save changes" : "Create warehouse"}</button>

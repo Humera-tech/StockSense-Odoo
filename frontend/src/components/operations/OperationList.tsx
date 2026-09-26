@@ -80,7 +80,7 @@ export default function OperationList({ type }: { type: "IN" | "OUT" }) {
             Clear late filter
           </button>
         )}
-        <div className="flex rounded-xl border border-slate-200 bg-white p-1 sm:ml-auto">
+        <div className="flex rounded-xl border border-line bg-surface p-1 sm:ml-auto">
           {(["list", "kanban"] as const).map((mode) => (
             <button
               key={mode}
@@ -88,7 +88,7 @@ export default function OperationList({ type }: { type: "IN" | "OUT" }) {
               aria-pressed={view === mode}
               onClick={() => updateParam("view", mode === "list" ? "" : mode)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition ${
-                view === mode ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100"
+                view === mode ? "bg-brand text-white" : "text-muted hover:bg-subtle"
               }`}
             >
               {mode}
@@ -103,7 +103,7 @@ export default function OperationList({ type }: { type: "IN" | "OUT" }) {
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <thead className="border-b border-line bg-subtle text-xs font-semibold uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-4 py-3">Reference</th>
                   <th className="px-4 py-3">From</th>
@@ -113,22 +113,22 @@ export default function OperationList({ type }: { type: "IN" | "OUT" }) {
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {operations?.map((op) => (
                   <tr
                     key={op.id}
                     onClick={() => navigate(`/operations/${op.id}`)}
-                    className="cursor-pointer transition hover:bg-slate-50"
+                    className="cursor-pointer transition hover:bg-subtle"
                   >
-                    <td className="px-4 py-3 font-semibold text-indigo-700">
+                    <td className="px-4 py-3 font-semibold text-brand">
                       <Link to={`/operations/${op.id}`} onClick={(e) => e.stopPropagation()}>
                         {op.reference}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{op.src_location.full_code}</td>
-                    <td className="px-4 py-3 text-slate-600">{op.dest_location.full_code}</td>
-                    <td className="px-4 py-3 text-slate-700">{op.contact?.name ?? "—"}</td>
-                    <td className={`px-4 py-3 ${op.is_late ? "font-semibold text-rose-600" : "text-slate-600"}`}>
+                    <td className="px-4 py-3 text-muted">{op.src_location.full_code}</td>
+                    <td className="px-4 py-3 text-muted">{op.dest_location.full_code}</td>
+                    <td className="px-4 py-3 text-ink/80">{op.contact?.name ?? "—"}</td>
+                    <td className={`px-4 py-3 ${op.is_late ? "font-semibold text-rose-600" : "text-muted"}`}>
                       {formatDate(op.scheduled_date)}
                       {op.is_late && <span className="ml-2 text-xs">Late</span>}
                     </td>
@@ -150,27 +150,27 @@ export default function OperationList({ type }: { type: "IN" | "OUT" }) {
             .map((column: OperationStatus) => {
               const cards = operations?.filter((op) => op.status === column) ?? [];
               return (
-                <section key={column} className="w-72 shrink-0 rounded-2xl bg-slate-100/70 p-3">
+                <section key={column} className="w-72 shrink-0 rounded-2xl bg-subtle p-3">
                   <div className="mb-3 flex items-center justify-between px-1">
                     <StatusBadge status={column} />
-                    <span className="text-xs font-semibold text-slate-500">{cards.length}</span>
+                    <span className="text-xs font-semibold text-muted">{cards.length}</span>
                   </div>
                   <div className="space-y-2">
                     {cards.map((op) => (
                       <Link
                         key={op.id}
                         to={`/operations/${op.id}`}
-                        className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-indigo-300"
+                        className="block rounded-xl border border-line bg-surface p-3 shadow-sm transition hover:border-brand/40"
                       >
-                        <p className="text-sm font-semibold text-slate-900">{op.reference}</p>
-                        <p className="mt-1 text-sm text-slate-600">{op.contact?.name ?? "—"}</p>
-                        <p className={`mt-2 text-xs ${op.is_late ? "font-semibold text-rose-600" : "text-slate-500"}`}>
+                        <p className="text-sm font-semibold text-ink">{op.reference}</p>
+                        <p className="mt-1 text-sm text-muted">{op.contact?.name ?? "—"}</p>
+                        <p className={`mt-2 text-xs ${op.is_late ? "font-semibold text-rose-600" : "text-muted"}`}>
                           {formatDate(op.scheduled_date)}
                           {op.is_late && " · Late"}
                         </p>
                       </Link>
                     ))}
-                    {cards.length === 0 && <p className="px-1 py-4 text-center text-xs text-slate-400">Nothing here</p>}
+                    {cards.length === 0 && <p className="px-1 py-4 text-center text-xs text-muted/70">Nothing here</p>}
                   </div>
                 </section>
               );

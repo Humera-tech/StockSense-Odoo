@@ -19,3 +19,12 @@ export function todayIso(): string {
 export function productLabel(product: { sku: string; name: string }): string {
   return `[${product.sku}] ${product.name}`;
 }
+
+export function initialsOf(name: string | undefined): string {
+  return (name ?? "?")
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}

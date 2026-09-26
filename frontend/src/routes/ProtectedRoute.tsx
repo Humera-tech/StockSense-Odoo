@@ -12,7 +12,7 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
   const location = useLocation();
 
   if (loading) {
-    return <div className="grid min-h-screen place-items-center text-sm text-slate-500">Loading…</div>;
+    return <div className="grid min-h-screen place-items-center text-sm text-muted">Loading…</div>;
   }
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;

@@ -1,71 +1,121 @@
-import { NavLink } from 'react-router-dom'
+import type { ComponentType, SVGProps } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 
-function Sidebar() {
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition ${
-      isActive
-        ? 'bg-indigo-600 text-white'
-        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-    }`
+import { useAuth } from "../../context/auth";
+import { initialsOf } from "../../lib/format";
+import Logo from "../brand/Logo";
+import {
+  BoxIcon,
+  CloseIcon,
+  DashboardIcon,
+  LogoutIcon,
+  PinIcon,
+  ReceiptIcon,
+  TruckIcon,
+  WarehouseIcon,
+} from "../ui/icons";
+
+type NavItem = { label: string; to: string; icon: ComponentType<SVGProps<SVGSVGElement>> };
+
+const NAV: { section?: string; items: NavItem[] }[] = [
+  {
+    items: [
+      { label: "Dashboard", to: "/dashboard", icon: DashboardIcon },
+      { label: "Products", to: "/stock", icon: BoxIcon },
+      { label: "Receipts", to: "/receipts", icon: ReceiptIcon },
+      { label: "Delivery Orders", to: "/deliveries", icon: TruckIcon },
+    ],
+  },
+  {
+    section: "Configuration",
+    items: [
+      { label: "Warehouses", to: "/settings/warehouses", icon: WarehouseIcon },
+      { label: "Locations", to: "/settings/locations", icon: PinIcon },
+    ],
+  },
+];
+
+export default function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-slate-200 bg-white transition-colors dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex h-16 items-center gap-3 border-b border-slate-200 px-5 dark:border-slate-800">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 font-bold text-white">
-          S
+    <>
+      {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden print:hidden" onClick={onClose} aria-hidden="true" />}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-surface transition-transform duration-200 lg:translate-x-0 print:hidden ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex h-18 items-center justify-between border-b border-line px-5">
+          <Logo size="sm" />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+            className="rounded-lg p-1.5 text-muted hover:bg-subtle hover:text-ink lg:hidden"
+          >
+            <CloseIcon />
+          </button>
         </div>
 
-        <div>
-          <h1 className="font-bold text-slate-900 dark:text-white">
-            StockSense
-          </h1>
+        <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-5">
+          {NAV.map((group, i) => (
+            <div key={group.section ?? i}>
+              {group.section && (
+                <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted/80">
+                  {group.section}
+                </p>
+              )}
+              <div className="space-y-1">
+                {group.items.map(({ label, to, icon: ItemIcon }) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                        isActive
+                          ? "bg-brand-soft font-semibold text-brand"
+                          : "text-ink/75 hover:bg-subtle hover:text-ink"
+                      }`
+                    }
+                  >
+                    <ItemIcon className="h-5 w-5 shrink-0" />
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          ))}
+        </nav>
 
-          <p className="text-xs text-slate-400">
-            Inventory Management
-          </p>
+        <div className="border-t border-line p-3">
+          <div className="flex items-center gap-3 rounded-xl p-2">
+            <div
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+              style={{ backgroundImage: "linear-gradient(135deg, var(--brand-from), var(--brand-to))" }}
+            >
+              {initialsOf(user?.name)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-ink">{user?.name}</p>
+              <p className="truncate text-xs text-muted">{user?.login_id}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+              aria-label="Log out"
+              title="Log out"
+              className="rounded-lg p-2 text-muted transition hover:bg-rose-500/10 hover:text-rose-600"
+            >
+              <LogoutIcon />
+            </button>
+          </div>
         </div>
-      </div>
-
-      <nav className="space-y-1 p-4">
-        <NavLink to="/" className={linkClass}>
-          <span>▦</span>
-          Dashboard
-        </NavLink>
-
-        <NavLink to="/products" className={linkClass}>
-          <span>□</span>
-          Products
-        </NavLink>
-
-        <NavLink to="/operations" className={linkClass}>
-          <span>↔</span>
-          Operations
-        </NavLink>
-
-        <NavLink to="/move-history" className={linkClass}>
-          <span>↻</span>
-          Move History
-        </NavLink>
-
-        <NavLink to="/settings" className={linkClass}>
-          <span>⚙</span>
-          Settings
-        </NavLink>
-      </nav>
-
-      <div className="absolute bottom-0 w-full border-t border-slate-200 p-4 dark:border-slate-800">
-        <NavLink to="/profile" className={linkClass}>
-          <span>◯</span>
-          Profile
-        </NavLink>
-
-        <button className="mt-1 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950">
-          <span>↪</span>
-          Logout
-        </button>
-      </div>
-    </aside>
-  )
+      </aside>
+    </>
+  );
 }
-
-export default Sidebar

@@ -15,6 +15,6 @@ export default function OperationPage({ type }: { type?: "IN" | "OUT" }) {
 
   const op = data?.id === opId ? data : undefined;
   if (error && !op) return <Alert>{error}</Alert>;
-  if (!op) return <p className="text-sm text-slate-500">Loading…</p>;
+  if (!op) return <p className="text-sm text-muted">Loading…</p>;
   return <OperationForm key={op.id} type={flowType(op.type)} initial={op} />;
 }

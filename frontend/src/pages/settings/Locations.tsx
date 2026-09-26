@@ -70,7 +70,7 @@ export default function Locations() {
           <div className="card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[480px] text-left text-sm">
-                <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <thead className="border-b border-line bg-subtle text-xs font-semibold uppercase tracking-wide text-muted">
                   <tr>
                     <th className="px-4 py-3">Location</th>
                     <th className="px-4 py-3">Name</th>
@@ -78,14 +78,14 @@ export default function Locations() {
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line">
                   {internal.map((loc) => (
                     <tr key={loc.id}>
-                      <td className="px-4 py-3 font-semibold text-slate-900">{loc.full_code}</td>
-                      <td className="px-4 py-3 text-slate-700">{loc.name}</td>
-                      <td className="px-4 py-3 text-slate-500">{warehouseCode.get(loc.warehouse_id)}</td>
+                      <td className="px-4 py-3 font-semibold text-ink">{loc.full_code}</td>
+                      <td className="px-4 py-3 text-ink/80">{loc.name}</td>
+                      <td className="px-4 py-3 text-muted">{warehouseCode.get(loc.warehouse_id)}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
-                        <button type="button" onClick={() => startEdit(loc)} className="mr-3 font-semibold text-indigo-600 hover:text-indigo-700">Edit</button>
+                        <button type="button" onClick={() => startEdit(loc)} className="mr-3 font-semibold text-brand hover:text-brand">Edit</button>
                         <button type="button" onClick={() => remove(loc)} className="font-semibold text-rose-600 hover:text-rose-700">Delete</button>
                       </td>
                     </tr>
@@ -96,14 +96,14 @@ export default function Locations() {
             {locations && internal.length === 0 && <EmptyState>No locations yet.</EmptyState>}
           </div>
           {virtual.length > 0 && (
-            <p className="px-1 text-xs text-slate-500">
+            <p className="px-1 text-xs text-muted">
               System locations (not editable): {[...new Set(virtual.map((loc) => loc.name))].join(", ")}.
             </p>
           )}
         </div>
 
         <form onSubmit={save} noValidate className="card h-fit space-y-4 p-5">
-          <h2 className="text-base font-semibold text-slate-900">{editing ? `Edit ${editing.full_code}` : "New location"}</h2>
+          <h2 className="text-base font-semibold text-ink">{editing ? `Edit ${editing.full_code}` : "New location"}</h2>
           <Field label="Name" htmlFor="loc-name" error={errors.name}>
             <input id="loc-name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               placeholder="Stock 3" className={`input ${errors.name ? "input-invalid" : ""}`} />

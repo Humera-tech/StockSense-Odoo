@@ -176,10 +176,10 @@ export default function OperationForm({ type, initial }: { type: "IN" | "OUT"; i
     <form onSubmit={onSubmit} noValidate>
       <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Link to={copy.listPath} className="text-sm font-medium text-slate-500 hover:text-slate-800 print:hidden">
+          <Link to={copy.listPath} className="text-sm font-medium text-muted hover:text-ink print:hidden">
             ← {copy.title}
           </Link>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">
             {op ? op.reference : `New ${copy.singular.toLowerCase()}`}
           </h1>
         </div>
@@ -226,14 +226,14 @@ export default function OperationForm({ type, initial }: { type: "IN" | "OUT"; i
             const reached = flow.indexOf(status) >= i;
             return (
               <div key={step} className="flex items-center gap-2">
-                {i > 0 && <span className="text-slate-300">→</span>}
+                {i > 0 && <span className="text-muted/70">→</span>}
                 <span
                   className={`rounded-full px-3 py-1 font-semibold ${
                     step === status
-                      ? "bg-indigo-600 text-white"
+                      ? "bg-brand text-white"
                       : reached
-                        ? "bg-indigo-50 text-indigo-700"
-                        : "bg-slate-100 text-slate-400"
+                        ? "bg-brand-soft text-brand"
+                        : "bg-subtle text-muted/70"
                   }`}
                 >
                   {STATUS_LABEL[step]}
@@ -275,7 +275,7 @@ export default function OperationForm({ type, initial }: { type: "IN" | "OUT"; i
               <input id="contact" value={op?.contact?.name ?? "—"} disabled className="input" />
             )}
             {type === "OUT" && (editable ? selectedContact : op?.contact)?.address && (
-              <p className="mt-1.5 text-xs text-slate-500">
+              <p className="mt-1.5 text-xs text-muted">
                 Delivery address: {(editable ? selectedContact : op?.contact)?.address}
               </p>
             )}
@@ -355,17 +355,17 @@ export default function OperationForm({ type, initial }: { type: "IN" | "OUT"; i
               disabled
               className="input"
             />
-            {op?.done_at && <p className="mt-1.5 text-xs text-slate-500">Done on {formatDate(op.done_at)}</p>}
+            {op?.done_at && <p className="mt-1.5 text-xs text-muted">Done on {formatDate(op.done_at)}</p>}
           </Field>
         </div>
 
         <div className="card overflow-hidden">
-          <div className="border-b border-slate-200 px-5 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">Products</h2>
+          <div className="border-b border-line px-5 py-3">
+            <h2 className="text-sm font-semibold text-ink">Products</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <thead className="bg-subtle text-xs font-semibold uppercase tracking-wide text-muted">
                 <tr>
                   <th className="px-5 py-2.5">Product</th>
                   <th className="w-36 px-5 py-2.5">Quantity</th>
@@ -373,7 +373,7 @@ export default function OperationForm({ type, initial }: { type: "IN" | "OUT"; i
                   {editable && <th className="w-12 px-2 py-2.5" />}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {form.lines.map((line, i) => {
                   const saved = op?.lines[i];
                   const free = freeByProduct.get(line.product_id);
@@ -386,7 +386,7 @@ export default function OperationForm({ type, initial }: { type: "IN" | "OUT"; i
                   const productError = errors[`lines.${i}.product_id`];
                   const qtyError = errors[`lines.${i}.quantity`];
                   return (
-                    <tr key={line.key} className={short ? "bg-rose-50" : undefined}>
+                    <tr key={line.key} className={short ? "bg-rose-500/10" : undefined}>
                       <td className="px-5 py-2.5 align-top">
                         {editable ? (
                           <>
@@ -406,7 +406,7 @@ export default function OperationForm({ type, initial }: { type: "IN" | "OUT"; i
                             {productError && <p className="mt-1 text-xs font-medium text-rose-600">{productError}</p>}
                           </>
                         ) : (
-                          <span className={short ? "font-semibold text-rose-700" : "text-slate-800"}>
+                          <span className={short ? "font-semibold text-rose-700" : "text-ink"}>
                             {saved ? productLabel(saved.product) : ""}
                           </span>
                         )}
@@ -427,11 +427,11 @@ export default function OperationForm({ type, initial }: { type: "IN" | "OUT"; i
                             {qtyError && <p className="mt-1 text-xs font-medium text-rose-600">{qtyError}</p>}
                           </>
                         ) : (
-                          <span className="text-slate-800">{line.quantity}</span>
+                          <span className="text-ink">{line.quantity}</span>
                         )}
                       </td>
                       {type === "OUT" && (
-                        <td className={`px-5 py-2.5 align-top ${short ? "font-semibold text-rose-600" : "text-slate-600"}`}>
+                        <td className={`px-5 py-2.5 align-top ${short ? "font-semibold text-rose-600" : "text-muted"}`}>
                           {editable
                             ? line.product_id && (free ?? 0)
                             : saved && `${saved.reserved_qty} / ${saved.quantity}`}
@@ -444,7 +444,7 @@ export default function OperationForm({ type, initial }: { type: "IN" | "OUT"; i
                             type="button"
                             aria-label={`Remove line ${i + 1}`}
                             onClick={() => setForm((prev) => ({ ...prev, lines: prev.lines.filter((l) => l.key !== line.key) }))}
-                            className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                            className="rounded-lg p-2 text-muted/70 hover:bg-rose-500/10 hover:text-rose-600"
                           >
                             ✕
                           </button>
@@ -462,7 +462,7 @@ export default function OperationForm({ type, initial }: { type: "IN" | "OUT"; i
               <button
                 type="button"
                 onClick={() => setForm((prev) => ({ ...prev, lines: [...prev.lines, newLine()] }))}
-                className="text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+                className="text-sm font-semibold text-brand hover:text-brand"
               >
                 + Add a product
               </button>
