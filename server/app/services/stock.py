@@ -216,6 +216,60 @@ def free_qty(db: Session, product_id: int, location_id: int) -> int:
     return on_hand_qty(db, product_id, location_id) - reserved_qty(db, product_id, location_id)
 
 
+@dataclass
+class StockLevel:
+    product: Product
+    on_hand: int
+    free_to_use: int
+
+
+def stock_levels(
+    db: Session,
+    search: str | None = None,
+    warehouse_id: int | None = None,
+    location_id: int | None = None,
+) -> list[StockLevel]:
+    def scoped(query):
+        query = query.where(Location.type == LocationType.INTERNAL)
+        if warehouse_id is not None:
+            query = query.where(Location.warehouse_id == warehouse_id)
+        if location_id is not None:
+            query = query.where(Location.id == location_id)
+        return query
+
+    on_hand = dict(
+        db.execute(
+            scoped(
+                select(StockQuant.product_id, func.sum(StockQuant.quantity))
+                .join(Location, StockQuant.location_id == Location.id)
+                .group_by(StockQuant.product_id)
+            )
+        ).all()
+    )
+    reserved = dict(
+        db.execute(
+            scoped(
+                select(OperationLine.product_id, func.sum(OperationLine.reserved_qty))
+                .join(Operation, OperationLine.operation_id == Operation.id)
+                .join(Location, Operation.src_location_id == Location.id)
+                .where(Operation.status.in_(RESERVING_STATUSES))
+                .group_by(OperationLine.product_id)
+            )
+        ).all()
+    )
+
+    products = select(Product).order_by(Product.name)
+    if search:
+        pattern = f"%{search.strip()}%"
+        products = products.where(Product.name.ilike(pattern) | Product.sku.ilike(pattern))
+
+    levels = []
+    for product in db.scalars(products):
+        qty = int(on_hand.get(product.id) or 0)
+        levels.append(StockLevel(product, qty, qty - int(reserved.get(product.id) or 0)))
+    return levels
+
+
 def _reserve(db: Session, op: Operation) -> bool:
     """Reserve as much as is free for each line; returns True when every line is fully covered."""
     db.flush()

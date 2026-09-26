@@ -24,3 +24,9 @@ class Location(Base):
     type: Mapped[LocationType] = mapped_column(Enum(LocationType, name="location_type"))
 
     warehouse: Mapped["Warehouse"] = relationship(back_populates="locations")
+
+    @property
+    def full_code(self) -> str:
+        if self.type == LocationType.INTERNAL:
+            return f"{self.warehouse.short_code}/{self.short_code}"
+        return self.name

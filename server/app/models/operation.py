@@ -42,3 +42,15 @@ class Operation(Base):
         back_populates="operation", cascade="all, delete-orphan", order_by="OperationLine.id"
     )
     moves: Mapped[list["StockMove"]] = relationship(back_populates="operation")
+    warehouse: Mapped["Warehouse"] = relationship()
+    contact: Mapped["Contact | None"] = relationship()
+    src_location: Mapped["Location"] = relationship(foreign_keys=[src_location_id])
+    dest_location: Mapped["Location"] = relationship(foreign_keys=[dest_location_id])
+    responsible: Mapped["User"] = relationship()
+
+    @property
+    def is_late(self) -> bool:
+        return self.scheduled_date < date.today() and self.status not in (
+            OperationStatus.DONE,
+            OperationStatus.CANCELLED,
+        )

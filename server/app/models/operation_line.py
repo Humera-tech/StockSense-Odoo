@@ -14,3 +14,4 @@ class OperationLine(Base):
     reserved_qty: Mapped[int] = mapped_column(Integer, default=0)
 
     operation: Mapped["Operation"] = relationship(back_populates="lines")
+    product: Mapped["Product"] = relationship()
