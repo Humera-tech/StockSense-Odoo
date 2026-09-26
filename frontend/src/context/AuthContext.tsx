@@ -24,10 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout])
 
   useEffect(() => {
-    if (!tokenStore.get()) {
-      setLoading(false)
-      return
-    }
+    if (!tokenStore.get()) return
 
     authService
       .me()
