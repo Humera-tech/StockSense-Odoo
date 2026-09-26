@@ -1,4 +1,6 @@
-from sqlalchemy import String
+from datetime import datetime
+
+from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -12,3 +14,5 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(255))
+    reset_otp_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    reset_otp_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
