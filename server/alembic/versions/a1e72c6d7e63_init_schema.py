@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision: str = 'a1e72c6d7e63'
@@ -16,18 +17,34 @@ down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-location_type = sa.Enum("INTERNAL", "VENDOR", "CUSTOMER", "ADJUSTMENT", name="location_type")
-contact_kind = sa.Enum("VENDOR", "CUSTOMER", name="contact_kind")
-operation_type = sa.Enum("IN", "OUT", "ADJ", name="operation_type")
-operation_status = sa.Enum("DRAFT", "WAITING", "READY", "DONE", "CANCELLED", name="operation_status")
+ENUMS = {
+    "location_type": ("INTERNAL", "VENDOR", "CUSTOMER", "ADJUSTMENT"),
+    "contact_kind": ("VENDOR", "CUSTOMER"),
+    "operation_type": ("IN", "OUT", "ADJ"),
+    "operation_status": ("DRAFT", "WAITING", "READY", "DONE", "CANCELLED"),
+}
+
+
+def _is_postgres() -> bool:
+    return op.get_bind().dialect.name == "postgresql"
+
+
+def _enum(name: str) -> sa.Enum:
+    # Postgres types are created once up front, so columns must not try to create them again
+    # (operation_type is shared by two tables).
+    if _is_postgres():
+        return postgresql.ENUM(*ENUMS[name], name=name, create_type=False)
+    return sa.Enum(*ENUMS[name], name=name)
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    location_type.create(bind, checkfirst=True)
-    contact_kind.create(bind, checkfirst=True)
-    operation_type.create(bind, checkfirst=True)
-    operation_status.create(bind, checkfirst=True)
+    if _is_postgres():
+        for name in ENUMS:
+            _enum(name).create(op.get_bind(), checkfirst=True)
+    location_type = _enum("location_type")
+    contact_kind = _enum("contact_kind")
+    operation_type = _enum("operation_type")
+    operation_status = _enum("operation_status")
 
     op.create_table(
         "users",
@@ -150,8 +167,6 @@ def downgrade() -> None:
     op.drop_index("ix_users_login_id", table_name="users")
     op.drop_table("users")
 
-    bind = op.get_bind()
-    operation_status.drop(bind, checkfirst=True)
-    operation_type.drop(bind, checkfirst=True)
-    contact_kind.drop(bind, checkfirst=True)
-    location_type.drop(bind, checkfirst=True)
+    if _is_postgres():
+        for name in ENUMS:
+            _enum(name).drop(op.get_bind(), checkfirst=True)
