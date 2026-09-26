@@ -1,0 +1,16 @@
+# Python
+server/.venv/
+server/__pycache__/
+**/__pycache__/
+*.pyc
+server/.pytest_cache/
+server/.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
