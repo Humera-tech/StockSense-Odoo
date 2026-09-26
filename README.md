@@ -22,9 +22,10 @@
 12. [Project Structure](#project-structure)
 13. [Local Setup](#local-setup)
 14. [Demo Flow](#demo-flow)
-15. [Team & Responsibilities](#team--responsibilities)
-16. [Git Workflow](#git-workflow)
-17. [Definition of Done](#definition-of-done)
+15. [Progress & Remaining Work](#progress--remaining-work)
+16. [Team & Responsibilities](#team--responsibilities)
+17. [Git Workflow](#git-workflow)
+18. [Definition of Done](#definition-of-done)
 
 ---
 
@@ -114,7 +115,7 @@ graph TD
     BE -- "SQLAlchemy" --> DB
 ```
 
-**Monorepo layout:** `frontend/` (React) · `server/` (FastAPI, planned)  
+**Monorepo layout:** `frontend/` (React) · `server/` (FastAPI)  
 **API contract:** FastAPI auto-generated `/docs` (Swagger UI)  
 **Runs fully offline** — no cloud dependencies.
 
@@ -124,12 +125,10 @@ graph TD
 
 | Layer | Choice |
 |-------|--------|
-| **Frontend** | React 19, TypeScript, Vite, Tailwind CSS v4, React Router, TanStack Query, react-hook-form + zod |
-| **Backend** | Python 3.11+, FastAPI, Uvicorn, Pydantic v2, SQLAlchemy 2.0, Alembic, passlib[bcrypt], python-jose (JWT), pytest |
+| **Frontend** | React 19, TypeScript, Vite, Tailwind CSS v4, React Router; data fetching via a small `fetch` wrapper (`services/api.ts`) and `useApi` hook |
+| **Backend** | Python 3.11+, FastAPI, Uvicorn, Pydantic v2, SQLAlchemy 2.0, Alembic, bcrypt, python-jose (JWT), pytest |
 | **Database** | PostgreSQL (local) · SQLite acceptable as fallback via `DATABASE_URL` |
-| **Tooling** | GitHub, branch protection on `main`, ESLint + Prettier, docker-compose |
-
-> **Note:** React Router, TanStack Query, react-hook-form, and zod are planned dependencies not yet in `package.json`. The backend (`server/`) has not been scaffolded yet.
+| **Tooling** | GitHub, ESLint, docker-compose |
 
 ---
 
@@ -153,7 +152,7 @@ graph TD
 | Field | Calculation |
 |-------|------------|
 | **On Hand** | `SUM(stock_quants.quantity)` across internal locations |
-| **Free to Use** | On Hand − qty reserved by **Ready** deliveries |
+| **Free to Use** | On Hand − qty reserved by **Waiting/Ready** deliveries (Waiting ones hold a partial reservation) |
 | **Waiting** | Delivery where ≥1 line has insufficient free stock |
 | **Late** | `scheduled_date < today` AND status ≠ Done/Cancelled |
 
@@ -189,12 +188,12 @@ All stock writes go through a single service (`services/stock.py`). Every write 
 
 | Rule | Behaviour |
 |------|-----------|
-| No negative quants | Blocked at engine level |
-| Quantity must be integer > 0 | Pydantic + engine |
-| Cannot edit lines after Done | HTTP 400 |
-| Cannot validate from Waiting | HTTP 400 |
-| Cannot cancel Done | HTTP 400 |
-| Cancel from any other state | Releases all reservations |
+| No negative quants | Blocked at engine level (HTTP 409) |
+| Quantity must be integer > 0 | Pydantic + engine (HTTP 422) |
+| Only Draft operations can be edited | HTTP 409 |
+| Cannot validate from Waiting | HTTP 409 |
+| Cannot validate twice / cancel Done | HTTP 409 |
+| Cancel from any other state | Releases reservations and re-checks Waiting deliveries |
 
 ---
 
@@ -294,15 +293,19 @@ StockSense-Odoo/
 │       ├── services/            # authService, inventoryService
 │       ├── types/               # auth, inventory, product
 │       └── data/                # mockData (placeholder)
-└── server/                      # FastAPI backend (planned)
-    ├── routers/
-    ├── services/
-    │   └── stock.py             # Stock Engine
-    ├── models/                  # SQLAlchemy ORM
-    └── schemas/                 # Pydantic schemas
+└── server/                      # FastAPI backend
+    ├── app/
+    │   ├── api/routes/          # auth, warehouses, locations, products, contacts, operations, stock
+    │   ├── core/                # config, database, security (bcrypt/JWT), error format
+    │   ├── models/              # SQLAlchemy ORM (one file per table)
+    │   ├── schemas/             # Pydantic request/response models (validation rules)
+    │   ├── services/stock.py    # Stock Engine
+    │   └── seed.py              # Demo data
+    ├── alembic/                 # Migrations
+    └── tests/                   # pytest (engine, API, seed)
 ```
 
-> **Current state:** Backend API, stock engine (receipts, deliveries with reservations/Waiting, cancel), seed data, and the frontend auth, receipts, deliveries, stock and settings screens are implemented. Adjustments, dashboard counts and move history are next.
+> **Current state:** see [Progress & Remaining Work](#progress--remaining-work).
 
 ---
 
@@ -368,6 +371,101 @@ The frontend dev server proxies `/api` to `localhost:8000`, so start the backend
 
 ---
 
+## Progress & Remaining Work
+
+_Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of Action timeline; update this section as items land._
+
+### Checkpoints
+
+| Time | Checkpoint | Status |
+|------|-----------|--------|
+| 9:40 | Scope + API contract frozen | ✅ |
+| 11:00 | Real login via UI; seed data in DB | ✅ |
+| 12:30 | End-to-end receipt: create → To Do → Validate → stock up | ✅ |
+| 12:30 | `main` green on every laptop | ⚠️ Everyone: pull, then run [Local Setup](#local-setup) once |
+| 14:30 | End-to-end delivery incl. Waiting | ✅ (already works: Waiting → auto Ready when a receipt lands) |
+| 15:30 | All P0 done, start P1 | ⏳ Needs Adjustments, Move History, live Dashboard |
+| 16:20 | Feature freeze | ⏳ |
+| 16:50 | Tagged `v1.0` and submitted | ⏳ |
+
+### Done so far
+
+- **Backend:** models + 2 migrations (tested on Postgres and SQLite); stock engine (references, create/edit Draft, To Do with reservations and Waiting, validate, Waiting re-check, cancel); all auth, master-data, operations and stock endpoints; `{ error: { field, message } }` everywhere; auth on every non-auth route; seed script; 52 pytest tests.
+- **Frontend:** login / sign up (Login ID + live password checklist) / forgot password + OTP reset wired to the API; top menu shell; Receipts and Deliveries with list, kanban, search and status filter; operation form (auto reference, responsible, line editor, To Do / Validate / Print / Cancel, red short lines + Waiting alert); Stock page (On Hand / Free to Use, new product); Settings → Warehouses and Locations. Verified in a browser at desktop and 375 px.
+
+### Remaining — by person
+
+**Hamza — stock engine & queries** (`server/app/services/stock.py`, tests in `server/tests/`)
+
+| When | Task |
+|------|------|
+| 13:00–14:30 | `adjust_stock(db, product_id, location_id, counted_qty, user_id)`: diff = counted − on hand; post an **ADJ** operation already Done (`WH/ADJ/0001`) with a move to/from the warehouse's ADJUSTMENT location; counted ≥ 0; re-check Waiting deliveries when stock goes up. |
+| 13:00–14:30 | `list_moves(db, q, type)`: move ledger rows with product, from/to locations, reference, contact, date and direction (IN / OUT / ADJ) for Move History. |
+| 13:00–14:30 | `dashboard_counts(db)`: receipts `{toReceive, late, operations}` and deliveries `{toDeliver, late, waiting, operations}` (late = scheduled before today and not Done/Cancelled; operations = scheduled after today). |
+| 14:30–15:30 | Guards for adjustments + tests; run the engine tests against Postgres. (Negative stock, double validate and edit-after-Done guards are already done and tested.) |
+| 15:30–17:00 | Bug fixes from QA; review backend changes; final merges. |
+
+**Mahreen — FastAPI layer** (`server/app/api/routes/`, `server/app/schemas/`)
+
+| When | Task |
+|------|------|
+| 13:00–14:30 | `GET /api/moves?q=&type=` (new `routes/moves.py`) calling `list_moves`. |
+| 13:00–14:30 | `GET /api/dashboard` (new `routes/dashboard.py`) calling `dashboard_counts`. |
+| 13:00–14:30 | `POST /api/stock/adjust` `{ product_id, location_id, counted_qty }` → "Quantity cannot be negative" on `counted_qty`. Register the new routers in `app/main.py` as protected routes. |
+| 14:30–15:30 | Edge-case validation pass on every endpoint; API tests for the new endpoints in `tests/test_api.py`. (Error shape, auth on every route and list search filters are done.) |
+| 15:30–17:00 | Bug fixes from QA; final merges. |
+
+**Asad — frontend operations screens** (`frontend/src/`)
+
+| When | Task |
+|------|------|
+| 13:00–14:30 | **Dashboard cards** (`pages/Dashboard.tsx` still shows placeholder zeros): Receipt card "N to receive", late, operations; Delivery card "N to deliver", late, waiting, operations, all from `GET /api/dashboard`. Cards link to filtered lists; the lists already support `?status=READY`, `?status=WAITING` and `?late=1`. |
+| 14:30–15:30 | **Move History** (`pages/operations/MoveHistory.tsx`): one row per product line, IN green / OUT red, list + kanban + search, from `GET /api/moves`. Add it to the top menu (`components/layout/Header.tsx`) and routes (`routes/AppRoutes.tsx`). |
+| 14:30–15:30 | **Print view** for Done receipts/deliveries: a proper printable layout (Print currently calls `window.print()` with the menu hidden). |
+| 15:30–16:20 | Visual consistency and kanban polish. |
+| 16:20–17:00 | Final walkthrough. **Push your own commits**: no commits from Asad on `main` yet. |
+
+**Lateef — stock UI, QA & release** (`frontend/src/`, repo root)
+
+| When | Task |
+|------|------|
+| 13:00–14:30 | **Editable stock cells** on the Stock page (`pages/products/Products.tsx`): edit On Hand → `POST /api/stock/adjust`, show the error under the cell. |
+| 13:00–14:30 | **Adjustments** page under Operations → Adjustments (`pages/operations/Adjustments.tsx`): list of ADJ operations (reuse `GET /api/operations?type=ADJ`). |
+| 13:00–14:30 | Hosted demo **only if required**: the Render static site builds, but it needs a rewrite `/*` → `/index.html`, a hosted API, and an API base URL in `services/api.ts`. The local demo works fully offline. |
+| 14:30–15:30 | QA with the demo script below; file issues for anything broken. |
+| 15:30–16:20 | Reset + reseed (`alembic downgrade base && alembic upgrade head && python -m app.seed`), rerun the demo, finalize this README. |
+| 16:20–17:00 | Tag `v1.0`, verify a fresh clone runs in under 5 minutes, submit by 16:50. |
+
+### Feature status (from the scope list)
+
+| Priority | Feature | Status | Owner |
+|----------|---------|--------|-------|
+| P0 | Login / Sign up with rules | ✅ | — |
+| P0 | Warehouse + Location settings | ✅ | — |
+| P0 | Products & stock page | ✅ view + new product · ⏳ editable cells | Lateef |
+| P0 | Receipts (list, form, Draft → Ready → Done) | ✅ | — |
+| P0 | Deliveries (Draft → Waiting → Ready → Done) | ✅ | — |
+| P0 | Auto references `WH/IN/0001` | ✅ | — |
+| P0 | Stock updates on Validate | ✅ | — |
+| P0 | Move History list | ⏳ | Hamza (query) · Mahreen (API) · Asad (UI) |
+| P0 | Dashboard cards | ⏳ placeholder | Hamza (query) · Mahreen (API) · Asad (UI) |
+| P1 | Kanban toggle by status | ✅ Receipts/Deliveries · ⏳ Move History | Asad |
+| P1 | Search by reference & contact | ✅ | — |
+| P1 | Out-of-stock red line + alert | ✅ | — |
+| P1 | Print receipt when Done | ✅ basic · ⏳ print layout | Asad |
+| P1 | Adjustments | ⏳ | Hamza (engine) · Mahreen (API) · Lateef (UI) |
+| P1 | Late / Waiting counts | ✅ in lists · ⏳ on dashboard | Asad |
+| P1 | Green IN / red OUT in history | ⏳ | Asad |
+| P1 | Forgot password | ✅ OTP reset (code shown on screen in offline demo mode) | — |
+| P2 | Low-stock highlight | ✅ out-of-stock rows red | — |
+| P2 | CSV export of history | ⏳ stretch, only if P0/P1 are done by 15:30 | Mahreen (endpoint) · Asad (button) |
+| P2 | Dark mode | ⏳ stretch | Asad |
+| P2 | Cancel flow polish | ✅ cancel with confirm + reservation release | — |
+
+**Demo script blockers:** step 3 (edit On Hand → adjustment in Move History), step 6 (Move History) and step 7 (live Dashboard) need the remaining items above. Steps 1, 2, 4 and 5 work today.
+
+---
+
 ## Team & Responsibilities
 
 | Member | Role | Owns | Branches |
@@ -395,11 +493,11 @@ The frontend dev server proxies `/api` to `localhost:8000`, so start the backend
 
 ## Definition of Done
 
-- [ ] Every mockup screen reachable from the menu and working against the real database
-- [ ] Receipt and delivery lifecycles — including **Waiting** — update stock correctly
-- [ ] References auto-increment per warehouse and type (`WH/IN/0001`, `WH/OUT/0001`)
-- [ ] All sign-up/login rules enforced server-side with clear error messages
-- [ ] List + kanban + search on Receipts, Deliveries, and Move History
-- [ ] Responsive at 375 px, one consistent color scheme
-- [ ] README with setup steps, stack, and schema; fresh clone runs in under 5 minutes
-- [ ] Commits from all team members, merged via PR
+- [ ] Every mockup screen reachable from the menu and working against the real database: Adjustments, Move History and live Dashboard still missing
+- [x] Receipt and delivery lifecycles — including **Waiting** — update stock correctly
+- [x] References auto-increment per warehouse and type (`WH/IN/0001`, `WH/OUT/0001`)
+- [x] All sign-up/login rules enforced server-side with clear error messages
+- [ ] List + kanban + search on Receipts, Deliveries, and Move History: Move History missing
+- [x] Responsive at 375 px, one consistent color scheme (built screens verified)
+- [ ] README with setup steps, stack, and schema; fresh clone runs in under 5 minutes: Lateef to verify at 16:20
+- [ ] Commits from all team members: Asad has none yet
