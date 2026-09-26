@@ -399,10 +399,10 @@ _Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of 
 
 | When | Task |
 |------|------|
-| 13:00–14:30 | `adjust_stock(db, product_id, location_id, counted_qty, user_id)`: diff = counted − on hand; post an **ADJ** operation already Done (`WH/ADJ/0001`) with a move to/from the warehouse's ADJUSTMENT location; counted ≥ 0; re-check Waiting deliveries when stock goes up. |
-| 13:00–14:30 | `list_moves(db, q, type)`: move ledger rows with product, from/to locations, reference, contact, date and direction (IN / OUT / ADJ) for Move History. |
-| 13:00–14:30 | `dashboard_counts(db)`: receipts `{toReceive, late, operations}` and deliveries `{toDeliver, late, waiting, operations}` (late = scheduled before today and not Done/Cancelled; operations = scheduled after today). |
-| 14:30–15:30 | Guards for adjustments + tests; run the engine tests against Postgres. (Negative stock, double validate and edit-after-Done guards are already done and tested.) |
+| ✅ 13:00–14:30 | `adjust_stock(db, product_id=, location_id=, counted_qty=, responsible_id=)`: diff = counted − on hand; post an **ADJ** operation already Done (`WH/ADJ/0001`) with a move to/from the warehouse's ADJUSTMENT location; counted ≥ 0; re-check Waiting deliveries when stock goes up. |
+| ✅ 13:00–14:30 | `list_moves(db, q, op_type)`: move ledger rows with product, from/to locations, reference, contact, date and direction (IN / OUT / ADJ) for Move History. |
+| ✅ 13:00–14:30 | `dashboard_counts(db)`: receipts `{toReceive, late, operations}` and deliveries `{toDeliver, late, waiting, operations}` (late = scheduled before today and not Done/Cancelled; operations = scheduled after today). |
+| ✅ 14:30–15:30 | Guards for adjustments + tests (counted ≥ 0, whole number, internal location only, cannot count below reserved); checked on Postgres. (Negative stock, double validate and edit-after-Done guards are already done and tested.) |
 | 15:30–17:00 | Bug fixes from QA; review backend changes; final merges. |
 
 **Backend — FastAPI layer** (`server/app/api/routes/`, `server/app/schemas/`)
@@ -447,13 +447,13 @@ _Last updated 26 Sep 2026, after the 12:30 checkpoint. Tasks follow the Plan of 
 | P0 | Deliveries (Draft → Waiting → Ready → Done) | ✅ | — |
 | P0 | Auto references `WH/IN/0001` | ✅ | — |
 | P0 | Stock updates on Validate | ✅ | — |
-| P0 | Move History list | ⏳ | Backend (query) · Backend (API) · Frontend (UI) |
-| P0 | Dashboard cards | ⏳ placeholder | Backend (query) · Backend (API) · Frontend (UI) |
+| P0 | Move History list | ✅ query · ⏳ API + UI | Backend (API) · Frontend (UI) |
+| P0 | Dashboard cards | ✅ counts query · ⏳ API + UI | Backend (API) · Frontend (UI) |
 | P1 | Kanban toggle by status | ✅ Receipts/Deliveries · ⏳ Move History | Frontend |
 | P1 | Search by reference & contact | ✅ | — |
 | P1 | Out-of-stock red line + alert | ✅ | — |
 | P1 | Print receipt when Done | ✅ basic · ⏳ print layout | Frontend |
-| P1 | Adjustments | ⏳ | Backend (engine) · Backend (API) · Frontend (UI) |
+| P1 | Adjustments | ✅ engine · ⏳ API + UI | Backend (API) · Frontend (UI) |
 | P1 | Late / Waiting counts | ✅ in lists · ⏳ on dashboard | Frontend |
 | P1 | Green IN / red OUT in history | ⏳ | Frontend |
 | P1 | Forgot password | ✅ OTP reset (code shown on screen in offline demo mode) | — |
