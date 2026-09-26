@@ -1,3 +1,7 @@
+// In production, set VITE_API_URL to the deployed backend's base URL (e.g. a Railway app).
+// Left unset, calls go to a relative /api path, which only works locally via the Vite dev proxy.
+const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+
 export class ApiError extends Error {
   status: number;
   field: string | null;
@@ -48,7 +52,7 @@ export async function api<T>(path: string, options: { method?: string; body?: un
 
   let response: Response;
   try {
-    response = await fetch(`/api${path}`, {
+    response = await fetch(`${API_BASE}/api${path}`, {
       method: options.method ?? "GET",
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
