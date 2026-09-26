@@ -1,21 +1,30 @@
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
+    Contact,
     Location,
     LocationType,
     Operation,
     OperationLine,
     OperationStatus,
     OperationType,
+    Product,
     Sequence,
     StockMove,
     StockQuant,
     Warehouse,
 )
+
+RESERVING_STATUSES = (OperationStatus.WAITING, OperationStatus.READY)
+
+EXPECTED_LOCATION_TYPES = {
+    OperationType.IN: (LocationType.VENDOR, LocationType.INTERNAL),
+    OperationType.OUT: (LocationType.INTERNAL, LocationType.CUSTOMER),
+}
 
 
 class StockError(Exception):
@@ -58,7 +67,7 @@ def next_reference(db: Session, warehouse: Warehouse, op_type: OperationType) ->
     return f"{warehouse.short_code}/{op_type.value}/{number:04d}"
 
 
-def _validate_lines(lines: list[LineInput]) -> None:
+def _validate_lines(db: Session, lines: list[LineInput]) -> None:
     if not lines:
         raise StockError("Add at least one product line", field="lines")
     seen: set[int] = set()
@@ -68,6 +77,34 @@ def _validate_lines(lines: list[LineInput]) -> None:
         if line.product_id in seen:
             raise StockError("Product already added to this operation", field=f"lines.{i}.product_id")
         seen.add(line.product_id)
+    existing = set(db.scalars(select(Product.id).where(Product.id.in_(seen))))
+    for i, line in enumerate(lines):
+        if line.product_id not in existing:
+            raise StockError("Product not found", field=f"lines.{i}.product_id")
+
+
+def _validate_header(
+    db: Session,
+    op_type: OperationType,
+    warehouse_id: int,
+    src_location_id: int,
+    dest_location_id: int,
+    contact_id: int | None,
+) -> None:
+    if op_type not in EXPECTED_LOCATION_TYPES:
+        raise StockError("Only receipts and deliveries can be created here", field="type")
+    src_type, dest_type = EXPECTED_LOCATION_TYPES[op_type]
+    for field, loc_id, expected in (
+        ("src_location_id", src_location_id, src_type),
+        ("dest_location_id", dest_location_id, dest_type),
+    ):
+        loc = db.get(Location, loc_id)
+        if loc is None or loc.warehouse_id != warehouse_id:
+            raise StockError("Location not found in this warehouse", field=field)
+        if loc.type != expected:
+            raise StockError(f"Location must be of type {expected.value}", field=field)
+    if contact_id is not None and db.get(Contact, contact_id) is None:
+        raise StockError("Contact not found", field="contact_id")
 
 
 def _get_operation(db: Session, op_id: int) -> Operation:
@@ -89,10 +126,11 @@ def create_operation(
     responsible_id: int,
     contact_id: int | None = None,
 ) -> Operation:
-    _validate_lines(lines)
     warehouse = db.get(Warehouse, warehouse_id)
     if warehouse is None:
         raise NotFoundError("Warehouse not found", field="warehouse_id")
+    _validate_header(db, op_type, warehouse_id, src_location_id, dest_location_id, contact_id)
+    _validate_lines(db, lines)
 
     try:
         op = Operation(
@@ -116,14 +154,113 @@ def create_operation(
     return op
 
 
+def update_operation(
+    db: Session,
+    op_id: int,
+    *,
+    src_location_id: int,
+    dest_location_id: int,
+    scheduled_date: date,
+    lines: list[LineInput],
+    contact_id: int | None = None,
+) -> Operation:
+    op = _get_operation(db, op_id)
+    if op.status != OperationStatus.DRAFT:
+        raise InvalidStateError("Only Draft operations can be edited")
+    _validate_header(db, op.type, op.warehouse_id, src_location_id, dest_location_id, contact_id)
+    _validate_lines(db, lines)
+
+    try:
+        op.src_location_id = src_location_id
+        op.dest_location_id = dest_location_id
+        op.scheduled_date = scheduled_date
+        op.contact_id = contact_id
+        existing = {l.product_id: l for l in op.lines}
+        new_lines = []
+        for l in lines:
+            line = existing.get(l.product_id) or OperationLine(product_id=l.product_id, reserved_qty=0)
+            line.quantity = l.quantity
+            new_lines.append(line)
+        op.lines = new_lines
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(op)
+    return op
+
+
+def reserved_qty(db: Session, product_id: int, location_id: int, exclude_line_id: int | None = None) -> int:
+    query = (
+        select(func.coalesce(func.sum(OperationLine.reserved_qty), 0))
+        .join(Operation, OperationLine.operation_id == Operation.id)
+        .where(
+            OperationLine.product_id == product_id,
+            Operation.src_location_id == location_id,
+            Operation.status.in_(RESERVING_STATUSES),
+        )
+    )
+    if exclude_line_id is not None:
+        query = query.where(OperationLine.id != exclude_line_id)
+    return int(db.scalar(query))
+
+
+def on_hand_qty(db: Session, product_id: int, location_id: int) -> int:
+    qty = db.scalar(
+        select(StockQuant.quantity).where(StockQuant.product_id == product_id, StockQuant.location_id == location_id)
+    )
+    return qty or 0
+
+
+def free_qty(db: Session, product_id: int, location_id: int) -> int:
+    return on_hand_qty(db, product_id, location_id) - reserved_qty(db, product_id, location_id)
+
+
+def _reserve(db: Session, op: Operation) -> bool:
+    """Reserve as much as is free for each line; returns True when every line is fully covered."""
+    db.flush()
+    all_covered = True
+    for line in op.lines:
+        on_hand = on_hand_qty(db, line.product_id, op.src_location_id)
+        held_by_others = reserved_qty(db, line.product_id, op.src_location_id, exclude_line_id=line.id)
+        line.reserved_qty = max(0, min(line.quantity, on_hand - held_by_others))
+        db.flush()
+        if line.reserved_qty < line.quantity:
+            all_covered = False
+    return all_covered
+
+
+def _recheck_waiting(db: Session, location_id: int) -> None:
+    waiting = db.scalars(
+        select(Operation)
+        .where(
+            Operation.type == OperationType.OUT,
+            Operation.status == OperationStatus.WAITING,
+            Operation.src_location_id == location_id,
+        )
+        .order_by(Operation.scheduled_date, Operation.id)
+    ).all()
+    for op in waiting:
+        if _reserve(db, op):
+            op.status = OperationStatus.READY
+
+
 def mark_todo(db: Session, op_id: int) -> Operation:
     op = _get_operation(db, op_id)
     if op.status != OperationStatus.DRAFT:
         raise InvalidStateError("Only Draft operations can be marked To Do")
-    if op.type != OperationType.IN:
-        raise InvalidStateError("To Do is only supported for receipts so far")
-    op.status = OperationStatus.READY
-    db.commit()
+
+    try:
+        if op.type == OperationType.IN:
+            op.status = OperationStatus.READY
+        elif op.type == OperationType.OUT:
+            op.status = OperationStatus.READY if _reserve(db, op) else OperationStatus.WAITING
+        else:
+            raise InvalidStateError("Adjustments are posted directly and have no To Do step")
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(op)
     return op
 
@@ -143,6 +280,8 @@ def _lock_quant(db: Session, product_id: int, location_id: int) -> StockQuant:
 
 def validate_operation(db: Session, op_id: int) -> Operation:
     op = _get_operation(db, op_id)
+    if op.status == OperationStatus.WAITING:
+        raise InvalidStateError("Some products are not in stock yet; this operation is still Waiting")
     if op.status != OperationStatus.READY:
         raise InvalidStateError("Only Ready operations can be validated")
 
@@ -150,12 +289,12 @@ def validate_operation(db: Session, op_id: int) -> Operation:
     dest = db.get(Location, op.dest_location_id)
 
     try:
-        for line in op.lines:
+        for i, line in enumerate(op.lines):
             # Quants are only tracked for internal locations; vendor/customer/adjustment are virtual.
             if src.type == LocationType.INTERNAL:
                 quant = _lock_quant(db, line.product_id, src.id)
                 if quant.quantity < line.quantity:
-                    raise InsufficientStockError("Not enough stock to validate", field=f"lines.{line.id}")
+                    raise InsufficientStockError("Not enough stock to validate", field=f"lines.{i}.quantity")
                 quant.quantity -= line.quantity
             if dest.type == LocationType.INTERNAL:
                 _lock_quant(db, line.product_id, dest.id).quantity += line.quantity
@@ -171,6 +310,30 @@ def validate_operation(db: Session, op_id: int) -> Operation:
             )
         op.status = OperationStatus.DONE
         op.done_at = datetime.now()
+        if dest.type == LocationType.INTERNAL:
+            _recheck_waiting(db, dest.id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(op)
+    return op
+
+
+def cancel_operation(db: Session, op_id: int) -> Operation:
+    op = _get_operation(db, op_id)
+    if op.status == OperationStatus.DONE:
+        raise InvalidStateError("Done operations cannot be cancelled")
+    if op.status == OperationStatus.CANCELLED:
+        raise InvalidStateError("Operation is already cancelled")
+
+    try:
+        released = any(line.reserved_qty for line in op.lines)
+        for line in op.lines:
+            line.reserved_qty = 0
+        op.status = OperationStatus.CANCELLED
+        if released:
+            _recheck_waiting(db, op.src_location_id)
         db.commit()
     except Exception:
         db.rollback()

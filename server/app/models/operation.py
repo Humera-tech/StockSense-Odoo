@@ -38,5 +38,7 @@ class Operation(Base):
     responsible_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     done_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
-    lines: Mapped[list["OperationLine"]] = relationship(back_populates="operation", cascade="all, delete-orphan")
+    lines: Mapped[list["OperationLine"]] = relationship(
+        back_populates="operation", cascade="all, delete-orphan", order_by="OperationLine.id"
+    )
     moves: Mapped[list["StockMove"]] = relationship(back_populates="operation")
