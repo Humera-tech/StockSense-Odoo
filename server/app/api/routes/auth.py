@@ -22,10 +22,13 @@ OTP_TTL = timedelta(minutes=10)
 
 @router.post("/signup", response_model=UserOut, status_code=201)
 def signup(body: SignupIn, db: Session = Depends(get_db)) -> User:
+    if db.scalar(select(User.id).where(User.login_id == body.login_id)):
+        raise ApiError(409, "Login ID already taken", "login_id")
     if db.scalar(select(User.id).where(User.email == body.email)):
         raise ApiError(409, "Email already registered", "email")
 
     user = User(
+        login_id=body.login_id,
         email=body.email,
         name=body.name,
         password_hash=hash_password(body.password),
@@ -40,19 +43,24 @@ def signup(body: SignupIn, db: Session = Depends(get_db)) -> User:
 
 @router.post("/login", response_model=TokenOut)
 def login(body: LoginIn, db: Session = Depends(get_db)) -> TokenOut:
-    email = body.login.strip().lower()
+    identifier = body.login.strip()
 
     user = db.scalar(
-        select(User).where(User.email == email)
+        select(User).where(or_(User.login_id == identifier, User.email == identifier.lower()))
     )
 
     if user is None or not verify_password(body.password, user.password_hash):
-        raise ApiError(401, "Invalid email or password")
+        raise ApiError(401, "Invalid Login Id or Password")
 
     return TokenOut(
         access_token=create_access_token(user.id),
         user=UserOut.model_validate(user),
     )
+
+
+@router.get("/me", response_model=UserOut)
+def me(user: User = Depends(get_current_user)) -> User:
+    return user
 
 
 @router.post("/forgot", response_model=ForgotOut)

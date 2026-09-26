@@ -2,8 +2,8 @@ import type { SignupPayload, TokenResponse, User } from "../types/auth";
 import { api } from "./api";
 
 export const authService = {
-  login: (email: string, password: string) =>
-    api<TokenResponse>("/auth/login", { method: "POST", body: { email, password } }),
+  login: (login: string, password: string) =>
+    api<TokenResponse>("/auth/login", { method: "POST", body: { login, password } }),
   signup: (payload: SignupPayload) => api<User>("/auth/signup", { method: "POST", body: payload }),
   me: () => api<User>("/auth/me"),
   forgot: (email: string) =>

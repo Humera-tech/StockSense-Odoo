@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import PasswordChecklist from "../../components/auth/PasswordChecklist";
-import { isEmailValid, isPasswordValid } from "../../lib/validation";
+import { isEmailValid, isPasswordValid, loginIdError } from "../../lib/validation";
 import { ApiError, errorMessage } from "../../services/api";
 import { authService } from "../../services/authService";
 
@@ -65,6 +65,7 @@ function Signup() {
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -81,6 +82,11 @@ function Signup() {
 
     if (!fullName.trim()) {
       nextErrors.name = "Enter your name";
+    }
+
+    const loginIdProblem = loginIdError(loginId);
+    if (loginIdProblem) {
+      nextErrors.login_id = loginIdProblem;
     }
 
     if (!isEmailValid(email)) {
@@ -109,6 +115,7 @@ function Signup() {
 
     try {
       await authService.signup({
+        login_id: loginId.trim(),
         email: email.trim(),
         name: fullName.trim(),
         password,
@@ -117,7 +124,7 @@ function Signup() {
 
       navigate("/login", {
         state: {
-          notice: "Account created. Sign in with your email.",
+          notice: "Account created. Sign in with your Login ID.",
         },
       });
     } catch (error) {
@@ -253,6 +260,29 @@ function Signup() {
                 />
 
                 <FieldError message={errors.name} />
+              </div>
+
+              {/* Login ID */}
+              <div>
+                <label
+                  htmlFor="signup-login-id"
+                  className="mb-2 block text-sm font-semibold text-slate-800"
+                >
+                  Login ID
+                </label>
+
+                <input
+                  id="signup-login-id"
+                  type="text"
+                  value={loginId}
+                  onChange={(event) => setLoginId(event.target.value)}
+                  placeholder="6–12 characters"
+                  autoComplete="username"
+                  required
+                  className={inputClass(!!errors.login_id)}
+                />
+
+                <FieldError message={errors.login_id} />
               </div>
 
               {/* Email */}

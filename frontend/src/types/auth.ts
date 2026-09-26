@@ -1,5 +1,6 @@
 export interface User {
   id: number
+  login_id: string
   email: string
   name: string
 }
@@ -11,6 +12,7 @@ export interface TokenResponse {
 }
 
 export interface SignupPayload {
+  login_id: string
   email: string
   name: string
   password: string

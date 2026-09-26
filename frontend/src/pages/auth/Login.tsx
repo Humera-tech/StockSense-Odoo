@@ -209,7 +209,7 @@ function Login() {
                   type="text"
                   value={identifier}
                   onChange={(event) => setIdentifier(event.target.value)}
-                  placeholder="Your email address"
+                  placeholder="Your Login ID"
                   autoComplete="username"
                   required
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10"
