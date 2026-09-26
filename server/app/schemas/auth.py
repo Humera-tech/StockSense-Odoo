@@ -33,21 +33,10 @@ def check_confirm(value: str, info: ValidationInfo) -> str:
 
 
 class SignupIn(BaseModel):
-    login_id: str
     email: str
     name: str
     password: str
     confirm_password: str
-
-    @field_validator("login_id")
-    @classmethod
-    def _login_id(cls, v: str) -> str:
-        v = v.strip()
-        if not 6 <= len(v) <= 12:
-            raise ValueError("Login ID must be 6–12 characters")
-        if re.search(r"\s", v):
-            raise ValueError("Login ID cannot contain spaces")
-        return v
 
     _email = field_validator("email")(check_email)
 
@@ -64,7 +53,7 @@ class SignupIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    login: str
+    email: str
     password: str
 
 
@@ -72,7 +61,6 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    login_id: str
     email: str
     name: str
 
