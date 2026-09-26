@@ -1,263 +1,182 @@
-import { useMemo, useState } from 'react'
-import Sidebar from '../layout/Sidebar'
-import Header from '../layout/Header'
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-type OperationType = 'IN' | 'OUT' | 'INTERNAL' | 'ADJUSTMENT'
+import { formatDate } from "../../lib/format";
+import { KANBAN_COLUMNS, STATUS_LABEL, TYPE_COPY } from "../../lib/status";
+import { useApi } from "../../lib/useApi";
+import { withQuery } from "../../services/api";
+import type { Operation, OperationStatus } from "../../types/inventory";
+import { Alert, EmptyState, PageHeader } from "../ui";
+import StatusBadge from "./StatusBadge";
 
-type OperationListProps = {
-  type: OperationType
+function withParam(prev: URLSearchParams, key: string, value: string) {
+  const next = new URLSearchParams(prev);
+  if (value) next.set(key, value);
+  else next.delete(key);
+  return next;
 }
 
-type Operation = {
-  id: number
-  reference: string
-  source: string
-  destination: string
-  scheduledDate: string
-  status: 'Draft' | 'Waiting' | 'Ready' | 'Done' | 'Cancelled'
-}
+export default function OperationList({ type }: { type: "IN" | "OUT" }) {
+  const copy = TYPE_COPY[type];
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const view = params.get("view") === "kanban" ? "kanban" : "list";
+  const status = params.get("status") ?? "";
+  const late = params.get("late") === "1";
+  const q = params.get("q") ?? "";
+  const [search, setSearch] = useState(q);
 
-const config: Record<
-  OperationType,
-  {
-    title: string
-    description: string
-    prefix: string
-  }
-> = {
-  IN: {
-    title: 'Receipts',
-    description: 'Manage incoming stock receipts',
-    prefix: 'WH/IN/',
-  },
-  OUT: {
-    title: 'Deliveries',
-    description: 'Manage outgoing stock deliveries',
-    prefix: 'WH/OUT/',
-  },
-  INTERNAL: {
-    title: 'Internal Transfers',
-    description: 'Move stock between locations',
-    prefix: 'WH/INT/',
-  },
-  ADJUSTMENT: {
-    title: 'Inventory Adjustments',
-    description: 'Adjust stock quantities',
-    prefix: 'WH/ADJ/',
-  },
-}
+  const updateParam = (key: string, value: string) => setParams((prev) => withParam(prev, key, value), { replace: true });
 
-function OperationList({ type }: OperationListProps) {
-  const current = config[type]
+  useEffect(() => {
+    const value = search.trim();
+    if (value === q) return;
+    const timer = setTimeout(() => setParams((prev) => withParam(prev, "q", value), { replace: true }), 300);
+    return () => clearTimeout(timer);
+  }, [search, q, setParams]);
 
-  const [operations, setOperations] = useState<Operation[]>([])
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('All')
-  const [showForm, setShowForm] = useState(false)
+  const { data: operations, error, loading } = useApi<Operation[]>(
+    withQuery("/operations", { type, status, q, late: late || undefined }),
+  );
 
-  const filteredOperations = useMemo(() => {
-    return operations.filter((operation) => {
-      const matchesSearch =
-        operation.reference.toLowerCase().includes(search.toLowerCase()) ||
-        operation.source.toLowerCase().includes(search.toLowerCase()) ||
-        operation.destination.toLowerCase().includes(search.toLowerCase())
-
-      const matchesStatus =
-        statusFilter === 'All' || operation.status === statusFilter
-
-      return matchesSearch && matchesStatus
-    })
-  }, [operations, search, statusFilter])
-
-  const createOperation = () => {
-    const number = String(operations.length + 1).padStart(4, '0')
-
-    const newOperation: Operation = {
-      id: Date.now(),
-      reference: `${current.prefix}${number}`,
-      source: type === 'IN' ? 'Vendors' : 'WH/Stock',
-      destination: type === 'OUT' ? 'Customers' : 'WH/Stock',
-      scheduledDate: new Date().toISOString().slice(0, 10),
-      status: 'Draft',
-    }
-
-    setOperations((items) => [newOperation, ...items])
-    setShowForm(false)
-  }
-
-  const validateOperation = (id: number) => {
-    setOperations((items) =>
-      items.map((operation) =>
-        operation.id === id
-          ? { ...operation, status: 'Done' }
-          : operation,
-      ),
-    )
-  }
+  const statuses = KANBAN_COLUMNS[type];
 
   return (
-    <div className="min-h-screen bg-slate-50 transition-colors dark:bg-slate-950">
-      <Sidebar />
+    <div>
+      <PageHeader
+        title={copy.title}
+        subtitle={late ? "Showing late operations only" : undefined}
+        actions={
+          <Link to={`${copy.listPath}/new`} className="btn btn-primary">
+            + New {copy.singular.toLowerCase()}
+          </Link>
+        }
+      />
 
-      <div className="ml-64">
-        <Header />
-
-        <main className="p-6">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-                {current.title}
-              </h1>
-
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {current.description}
-              </p>
-            </div>
-
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by reference or contact…"
+          aria-label="Search"
+          className="input sm:max-w-sm"
+        />
+        <select
+          value={status}
+          onChange={(e) => updateParam("status", e.target.value)}
+          aria-label="Filter by status"
+          className="input sm:w-44"
+        >
+          <option value="">All statuses</option>
+          {statuses.map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABEL[s]}
+            </option>
+          ))}
+        </select>
+        {late && (
+          <button type="button" onClick={() => updateParam("late", "")} className="btn btn-secondary">
+            Clear late filter
+          </button>
+        )}
+        <div className="flex rounded-xl border border-slate-200 bg-white p-1 sm:ml-auto">
+          {(["list", "kanban"] as const).map((mode) => (
             <button
-              onClick={() => setShowForm(true)}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+              key={mode}
+              type="button"
+              aria-pressed={view === mode}
+              onClick={() => updateParam("view", mode === "list" ? "" : mode)}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition ${
+                view === mode ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100"
+              }`}
             >
-              + New Operation
+              {mode}
             </button>
-          </div>
-
-          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 md:flex-row">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search operations..."
-              className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-            />
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-white"
-            >
-              <option>All</option>
-              <option>Draft</option>
-              <option>Waiting</option>
-              <option>Ready</option>
-              <option>Done</option>
-              <option>Cancelled</option>
-            </select>
-          </div>
-
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-            {filteredOperations.length === 0 ? (
-              <div className="px-6 py-16 text-center">
-                <div className="text-4xl">📦</div>
-
-                <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">
-                  No operations yet
-                </h2>
-
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  Create your first operation to get started.
-                </p>
-
-                <button
-                  onClick={() => setShowForm(true)}
-                  className="mt-5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  Create Operation
-                </button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950">
-                    <tr>
-                      <th className="px-6 py-4 font-semibold">Reference</th>
-                      <th className="px-6 py-4 font-semibold">Source</th>
-                      <th className="px-6 py-4 font-semibold">Destination</th>
-                      <th className="px-6 py-4 font-semibold">Scheduled</th>
-                      <th className="px-6 py-4 font-semibold">Status</th>
-                      <th className="px-6 py-4 font-semibold">Action</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {filteredOperations.map((operation) => (
-                      <tr
-                        key={operation.id}
-                        className="border-b border-slate-100 dark:border-slate-800"
-                      >
-                        <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">
-                          {operation.reference}
-                        </td>
-
-                        <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                          {operation.source}
-                        </td>
-
-                        <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                          {operation.destination}
-                        </td>
-
-                        <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                          {operation.scheduledDate}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                            {operation.status}
-                          </span>
-                        </td>
-
-                        <td className="px-6 py-4">
-                          {operation.status !== 'Done' &&
-                            operation.status !== 'Cancelled' && (
-                              <button
-                                onClick={() => validateOperation(operation.id)}
-                                className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                              >
-                                Validate
-                              </button>
-                            )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </main>
+          ))}
+        </div>
       </div>
 
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl dark:bg-slate-900">
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              New {current.title.slice(0, -1)}
-            </h2>
+      {error && <Alert>{error}</Alert>}
 
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              A new draft operation will be created with an automatic reference.
-            </p>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setShowForm(false)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-slate-700 dark:text-white"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={createOperation}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-              >
-                Create Draft
-              </button>
-            </div>
+      {view === "list" ? (
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Reference</th>
+                  <th className="px-4 py-3">From</th>
+                  <th className="px-4 py-3">To</th>
+                  <th className="px-4 py-3">Contact</th>
+                  <th className="px-4 py-3">Schedule date</th>
+                  <th className="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {operations?.map((op) => (
+                  <tr
+                    key={op.id}
+                    onClick={() => navigate(`/operations/${op.id}`)}
+                    className="cursor-pointer transition hover:bg-slate-50"
+                  >
+                    <td className="px-4 py-3 font-semibold text-indigo-700">
+                      <Link to={`/operations/${op.id}`} onClick={(e) => e.stopPropagation()}>
+                        {op.reference}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{op.src_location.full_code}</td>
+                    <td className="px-4 py-3 text-slate-600">{op.dest_location.full_code}</td>
+                    <td className="px-4 py-3 text-slate-700">{op.contact?.name ?? "—"}</td>
+                    <td className={`px-4 py-3 ${op.is_late ? "font-semibold text-rose-600" : "text-slate-600"}`}>
+                      {formatDate(op.scheduled_date)}
+                      {op.is_late && <span className="ml-2 text-xs">Late</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={op.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+          {!loading && operations?.length === 0 && <EmptyState>No {copy.title.toLowerCase()} found.</EmptyState>}
+          {loading && !operations && <EmptyState>Loading…</EmptyState>}
+        </div>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {statuses
+            .filter((s) => !status || s === status)
+            .map((column: OperationStatus) => {
+              const cards = operations?.filter((op) => op.status === column) ?? [];
+              return (
+                <section key={column} className="w-72 shrink-0 rounded-2xl bg-slate-100/70 p-3">
+                  <div className="mb-3 flex items-center justify-between px-1">
+                    <StatusBadge status={column} />
+                    <span className="text-xs font-semibold text-slate-500">{cards.length}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {cards.map((op) => (
+                      <Link
+                        key={op.id}
+                        to={`/operations/${op.id}`}
+                        className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition hover:border-indigo-300"
+                      >
+                        <p className="text-sm font-semibold text-slate-900">{op.reference}</p>
+                        <p className="mt-1 text-sm text-slate-600">{op.contact?.name ?? "—"}</p>
+                        <p className={`mt-2 text-xs ${op.is_late ? "font-semibold text-rose-600" : "text-slate-500"}`}>
+                          {formatDate(op.scheduled_date)}
+                          {op.is_late && " · Late"}
+                        </p>
+                      </Link>
+                    ))}
+                    {cards.length === 0 && <p className="px-1 py-4 text-center text-xs text-slate-400">Nothing here</p>}
+                  </div>
+                </section>
+              );
+            })}
         </div>
       )}
     </div>
-  )
+  );
 }
-
-export default OperationList

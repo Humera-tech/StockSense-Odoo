@@ -1,360 +1,129 @@
-import { useState } from 'react'
-import Sidebar from '../../components/layout/Sidebar'
-import Header from '../../components/layout/Header'
-import ProductForm from '../../components/products/ProductForm'
+import { useState } from "react";
+import type { FormEvent } from "react";
 
-type Product = {
-  id: number
-  sku: string
-  name: string
-  category: string
-  cost: number
-  stock: number
-  freeToUse: number
-  location: string
-}
+import { Alert, EmptyState, Field, PageHeader } from "../../components/ui";
+import { formatMoney } from "../../lib/format";
+import { useApi } from "../../lib/useApi";
+import { ApiError, errorMessage, withQuery } from "../../services/api";
+import { inventoryService } from "../../services/inventoryService";
+import type { StockLevel } from "../../types/product";
 
-function Products() {
-  const [products, setProducts] = useState<Product[]>([])
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('All Categories')
-  const [location, setLocation] = useState('All Locations')
-  const [showForm, setShowForm] = useState(false)
+const EMPTY_PRODUCT = { sku: "", name: "", unit_cost: "", uom: "unit" };
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.name.toLowerCase().includes(search.toLowerCase()) ||
-      product.sku.toLowerCase().includes(search.toLowerCase())
+export default function Products() {
+  const [search, setSearch] = useState("");
+  const { data: levels, error, loading, reload } = useApi<StockLevel[]>(withQuery("/stock", { search: search.trim() }));
+  const [showForm, setShowForm] = useState(false);
+  const [draft, setDraft] = useState(EMPTY_PRODUCT);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
-    const matchesCategory =
-      category === 'All Categories' || product.category === category
+  async function createProduct(e: FormEvent) {
+    e.preventDefault();
+    const errs: Record<string, string> = {};
+    if (!draft.sku.trim()) errs.sku = "Enter a SKU";
+    if (!draft.name.trim()) errs.name = "Enter a product name";
+    const cost = Number(draft.unit_cost);
+    if (draft.unit_cost.trim() === "" || Number.isNaN(cost) || cost < 0) errs.unit_cost = "Enter a cost of 0 or more";
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
 
-    const matchesLocation =
-      location === 'All Locations' || product.location === location
-
-    return matchesSearch && matchesCategory && matchesLocation
-  })
-
-  const updateStock = (id: number, value: number) => {
-    const safeValue = Math.max(0, value)
-
-    setProducts((current) =>
-      current.map((product) =>
-        product.id === id
-          ? {
-              ...product,
-              stock: safeValue,
-              freeToUse: Math.min(product.freeToUse, safeValue),
-            }
-          : product,
-      ),
-    )
-  }
-
-  const addProduct = (product: {
-    sku: string
-    name: string
-    category: string
-    cost: number
-    stock: number
-    location: string
-  }) => {
-    const newProduct: Product = {
-      id: Date.now(),
-      sku: product.sku,
-      name: product.name,
-      category: product.category,
-      cost: product.cost,
-      stock: product.stock,
-      freeToUse: product.stock,
-      location: product.location,
+    setSaving(true);
+    try {
+      await inventoryService.createProduct({ ...draft, unit_cost: cost });
+      setDraft(EMPTY_PRODUCT);
+      setShowForm(false);
+      reload();
+    } catch (err) {
+      setErrors(err instanceof ApiError && err.field ? { [err.field]: err.message } : { form: errorMessage(err) });
+    } finally {
+      setSaving(false);
     }
-
-    setProducts((current) => [newProduct, ...current])
-    setShowForm(false)
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 transition-colors dark:bg-slate-950">
-      <Sidebar />
+    <div>
+      <PageHeader
+        title="Stock"
+        subtitle="On hand and free-to-use quantities across internal locations."
+        actions={
+          <button type="button" onClick={() => setShowForm((v) => !v)} className="btn btn-primary">
+            {showForm ? "Close" : "+ New product"}
+          </button>
+        }
+      />
 
-      <div className="ml-64">
-        <Header />
-
-        <main className="p-6">
-          {/* Page Header */}
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-                Products & Stock
-              </h1>
-
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Manage products and inventory availability
-              </p>
-            </div>
-
-            <button
-              onClick={() => setShowForm(true)}
-              className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-            >
-              + Add Product
-            </button>
-          </div>
-
-          {/* Filters */}
-          <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-4">
-              <h2 className="font-semibold text-slate-900 dark:text-white">
-                Inventory Filters
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-400">
-                Search and filter your products
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {/* Search */}
-              <div>
-                <label className="mb-2 block text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Search
-                </label>
-
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search product or SKU..."
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:ring-indigo-950"
-                />
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="mb-2 block text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Category
-                </label>
-
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                >
-                  <option>All Categories</option>
-                  <option>Raw Materials</option>
-                  <option>Hardware</option>
-                  <option>Chemicals</option>
-                  <option>Safety</option>
-                </select>
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className="mb-2 block text-xs font-medium text-slate-500 dark:text-slate-400">
-                  Location
-                </label>
-
-                <select
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700 outline-none focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                >
-                  <option>All Locations</option>
-                  <option>WH-01</option>
-                  <option>WH-02</option>
-                  <option>WH-03</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Inventory Table */}
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            {/* Table Header */}
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-              <div>
-                <h2 className="font-semibold text-slate-900 dark:text-white">
-                  Inventory
-                </h2>
-
-                <p className="mt-1 text-xs text-slate-400">
-                  {filteredProducts.length}{' '}
-                  {filteredProducts.length === 1 ? 'product' : 'products'} found
-                </p>
-              </div>
-
-              {products.length > 0 && (
-                <button
-                  onClick={() => setShowForm(true)}
-                  className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                >
-                  + Add Product
-                </button>
-              )}
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[950px] text-left">
-                <thead className="bg-slate-50 dark:bg-slate-800/50">
-                  <tr>
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Product
-                    </th>
-
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Category
-                    </th>
-
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Cost
-                    </th>
-
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      On Hand
-                    </th>
-
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Free to Use
-                    </th>
-
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Location
-                    </th>
-
-                    <th className="px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {/* EMPTY STATE */}
-                  {filteredProducts.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-5 py-20 text-center">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-2xl dark:bg-slate-800">
-                          📦
-                        </div>
-
-                        <h3 className="mt-5 text-base font-semibold text-slate-900 dark:text-white">
-                          {products.length === 0
-                            ? 'No products yet'
-                            : 'No products found'}
-                        </h3>
-
-                        <p className="mx-auto mt-2 max-w-sm text-sm text-slate-400">
-                          {products.length === 0
-                            ? 'Add your first product to start managing your inventory.'
-                            : 'Try changing your search or filters.'}
-                        </p>
-
-                        {products.length === 0 && (
-                          <button
-                            onClick={() => setShowForm(true)}
-                            className="mt-5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                          >
-                            + Add Your First Product
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredProducts.map((product) => {
-                      const outOfStock = product.stock === 0
-                      const lowStock =
-                        product.stock > 0 && product.stock < 20
-
-                      return (
-                        <tr
-                          key={product.id}
-                          className="transition hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                        >
-                          {/* Product */}
-                          <td className="px-5 py-4">
-                            <p className="font-semibold text-slate-800 dark:text-white">
-                              {product.name}
-                            </p>
-
-                            <p className="mt-1 text-xs text-slate-400">
-                              {product.sku}
-                            </p>
-                          </td>
-
-                          {/* Category */}
-                          <td className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">
-                            {product.category}
-                          </td>
-
-                          {/* Cost */}
-                          <td className="px-5 py-4 text-sm font-medium text-slate-700 dark:text-slate-200">
-                            ₹{product.cost.toFixed(2)}
-                          </td>
-
-                          {/* On Hand */}
-                          <td className="px-5 py-4">
-                            <input
-                              type="number"
-                              min="0"
-                              value={product.stock}
-                              onChange={(e) =>
-                                updateStock(
-                                  product.id,
-                                  Number(e.target.value),
-                                )
-                              }
-                              className="w-24 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none transition focus:border-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                            />
-                          </td>
-
-                          {/* Free to Use */}
-                          <td className="px-5 py-4 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                            {product.freeToUse}
-                          </td>
-
-                          {/* Location */}
-                          <td className="px-5 py-4">
-                            <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                              {product.location}
-                            </span>
-                          </td>
-
-                          {/* Status */}
-                          <td className="px-5 py-4">
-                            {outOfStock ? (
-                              <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-600 dark:bg-red-950 dark:text-red-400">
-                                Out of Stock
-                              </span>
-                            ) : lowStock ? (
-                              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-600 dark:bg-amber-950 dark:text-amber-400">
-                                Low Stock
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
-                                In Stock
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </main>
-      </div>
-
-      {/* Add Product Modal */}
       {showForm && (
-        <ProductForm
-          onClose={() => setShowForm(false)}
-          onAdd={addProduct}
-        />
+        <form onSubmit={createProduct} noValidate className="card mb-5 grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-5">
+          <Field label="SKU" htmlFor="sku" error={errors.sku}>
+            <input id="sku" value={draft.sku} onChange={(e) => setDraft({ ...draft, sku: e.target.value })}
+              placeholder="DESK001" className={`input ${errors.sku ? "input-invalid" : ""}`} />
+          </Field>
+          <div className="lg:col-span-2">
+            <Field label="Name" htmlFor="name" error={errors.name}>
+              <input id="name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                placeholder="Desk" className={`input ${errors.name ? "input-invalid" : ""}`} />
+            </Field>
+          </div>
+          <Field label="Per-unit cost" htmlFor="cost" error={errors.unit_cost}>
+            <input id="cost" type="number" min={0} step="0.01" value={draft.unit_cost}
+              onChange={(e) => setDraft({ ...draft, unit_cost: e.target.value })}
+              className={`input ${errors.unit_cost ? "input-invalid" : ""}`} />
+          </Field>
+          <Field label="Unit" htmlFor="uom" error={errors.uom}>
+            <input id="uom" value={draft.uom} onChange={(e) => setDraft({ ...draft, uom: e.target.value })} className="input" />
+          </Field>
+          <div className="flex items-center gap-3 sm:col-span-2 lg:col-span-5">
+            <button type="submit" disabled={saving} className="btn btn-primary">Create product</button>
+            {errors.form && <span className="text-sm text-rose-600">{errors.form}</span>}
+          </div>
+        </form>
       )}
-    </div>
-  )
-}
 
-export default Products
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search by product name or SKU…"
+        aria-label="Search products"
+        className="input mb-4 sm:max-w-sm"
+      />
+
+      {error && <Alert>{error}</Alert>}
+
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Product</th>
+                <th className="px-4 py-3 text-right">Per-unit cost</th>
+                <th className="px-4 py-3 text-right">On hand</th>
+                <th className="px-4 py-3 text-right">Free to use</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {levels?.map(({ product, on_hand, free_to_use }) => (
+                <tr key={product.id} className={on_hand === 0 ? "bg-rose-50/60" : undefined}>
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-slate-500">[{product.sku}]</span>{" "}
+                    <span className="font-medium text-slate-900">{product.name}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">{formatMoney(product.unit_cost)}</td>
+                  <td className={`px-4 py-3 text-right font-semibold ${on_hand === 0 ? "text-rose-600" : "text-slate-900"}`}>
+                    {on_hand} <span className="text-xs font-normal text-slate-400">{product.uom}</span>
+                  </td>
+                  <td className={`px-4 py-3 text-right font-semibold ${free_to_use <= 0 ? "text-rose-600" : "text-emerald-700"}`}>
+                    {free_to_use}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!loading && levels?.length === 0 && <EmptyState>No products found.</EmptyState>}
+        {loading && !levels && <EmptyState>Loading…</EmptyState>}
+      </div>
+    </div>
+  );
+}
