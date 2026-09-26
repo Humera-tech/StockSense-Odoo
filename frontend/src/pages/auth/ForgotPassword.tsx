@@ -1,20 +1,33 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { isEmailValid } from "../../lib/validation";
+import { errorMessage } from "../../services/api";
+import { authService } from "../../services/authService";
+
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!isEmailValid(email)) {
+      setError("Enter a valid email");
+      return;
+    }
 
-    if (!email) return;
-
-    // Temporary frontend flow.
-    // Backend will send OTP to this email.
-    navigate("/verify-otp", {
-      state: { email },
-    });
+    setError(null);
+    setSubmitting(true);
+    try {
+      const response = await authService.forgot(email);
+      navigate("/verify-otp", { state: { email: email.trim(), devOtp: response.dev_otp } });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -96,7 +109,13 @@ export default function ForgotPassword() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-6">
+            {error && (
+              <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                {error}
+              </p>
+            )}
+
             {/* Email */}
             <div>
               <label
@@ -121,9 +140,10 @@ export default function ForgotPassword() {
             {/* Submit */}
             <button
               type="submit"
-              className="w-full rounded-xl bg-indigo-600 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
+              disabled={submitting}
+              className="w-full rounded-xl bg-indigo-600 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 disabled:opacity-60"
             >
-              Send OTP
+              {submitting ? "Sending…" : "Send OTP"}
             </button>
           </form>
 

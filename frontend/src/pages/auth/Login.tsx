@@ -1,21 +1,35 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+
+import { useAuth } from "../../context/auth";
+import { errorMessage } from "../../services/api";
 
 function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user, login } = useAuth();
+  const state = location.state as { from?: string; notice?: string } | null;
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  if (user) return <Navigate to={state?.from ?? "/dashboard"} replace />;
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    // Temporary frontend login
-    // Replace with real authentication later.
-    if (email && password) {
-      navigate("/dashboard");
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(identifier, password, rememberMe);
+      navigate(state?.from ?? "/dashboard", { replace: true });
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -107,24 +121,36 @@ function Login() {
             </p>
           </div>
 
+          {state?.notice && (
+            <p role="status" className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {state.notice}
+            </p>
+          )}
+
           {/* Form */}
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-            {/* Email */}
+            {error && (
+              <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                {error}
+              </p>
+            )}
+
+            {/* Login ID */}
             <div>
               <label
-                htmlFor="login-email"
+                htmlFor="login-id"
                 className="mb-2 block text-sm font-semibold text-slate-800"
               >
-                Email address
+                Login ID or email
               </label>
 
               <input
-                id="login-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
+                id="login-id"
+                type="text"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="Your Login ID"
+                autoComplete="username"
                 required
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10"
               />
@@ -217,9 +243,10 @@ function Login() {
             {/* Login button */}
             <button
               type="submit"
-              className="group flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:-translate-y-0.5 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
+              disabled={submitting}
+              className="group flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:-translate-y-0.5 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 disabled:opacity-60"
             >
-              Sign in
+              {submitting ? "Signing in…" : "Sign in"}
               <span className="transition-transform group-hover:translate-x-1">
                 →
               </span>

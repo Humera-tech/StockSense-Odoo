@@ -1,37 +1,65 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import PasswordChecklist from "../../components/auth/PasswordChecklist";
+import { isEmailValid, isPasswordValid, loginIdError } from "../../lib/validation";
+import { ApiError, errorMessage } from "../../services/api";
+import { authService } from "../../services/authService";
+
+const inputClass = (invalid: boolean) =>
+  `w-full rounded-xl border bg-slate-50 px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-4 ${
+    invalid
+      ? "border-red-300 focus:border-red-500 focus:ring-red-500/10"
+      : "border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/10"
+  }`;
+
+function FieldError({ message }: { message?: string }) {
+  return message ? <p className="mt-2 text-xs font-medium text-red-500">{message}</p> : null;
+}
+
 function Signup() {
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState("");
+  const [loginId, setLoginId] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (
-      !fullName ||
-      !email ||
-      !password ||
-      !confirmPassword ||
-      !agreeTerms
-    ) {
-      return;
-    }
+    const errs: Record<string, string> = {};
+    if (!fullName.trim()) errs.name = "Enter your name";
+    const loginIdProblem = loginIdError(loginId);
+    if (loginIdProblem) errs.login_id = loginIdProblem;
+    if (!isEmailValid(email)) errs.email = "Enter a valid email";
+    if (!isPasswordValid(password)) errs.password = "Password does not meet all the rules below";
+    if (password !== confirmPassword) errs.confirm_password = "Passwords do not match";
+    if (!agreeTerms) errs.terms = "Please accept the terms to continue";
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
 
-    if (password !== confirmPassword) {
-      return;
+    setSubmitting(true);
+    try {
+      await authService.signup({
+        login_id: loginId.trim(),
+        email,
+        name: fullName,
+        password,
+        confirm_password: confirmPassword,
+      });
+      navigate("/login", { state: { notice: "Account created. Sign in with your Login ID." } });
+    } catch (err) {
+      setErrors(err instanceof ApiError && err.field ? { [err.field]: err.message } : { form: errorMessage(err) });
+    } finally {
+      setSubmitting(false);
     }
-
-    // Temporary frontend signup
-    // Replace with real backend authentication later.
-    navigate("/dashboard");
   };
 
   return (
@@ -123,7 +151,13 @@ function Signup() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-4">
+            {errors.form && (
+              <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                {errors.form}
+              </p>
+            )}
+
             {/* Full name */}
             <div>
               <label
@@ -141,8 +175,31 @@ function Signup() {
                 placeholder="John Doe"
                 autoComplete="name"
                 required
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10"
+                className={inputClass(!!errors.name)}
               />
+              <FieldError message={errors.name} />
+            </div>
+
+            {/* Login ID */}
+            <div>
+              <label
+                htmlFor="login-id"
+                className="mb-2 block text-sm font-semibold text-slate-800"
+              >
+                Login ID
+              </label>
+
+              <input
+                id="login-id"
+                type="text"
+                value={loginId}
+                onChange={(e) => setLoginId(e.target.value)}
+                placeholder="6–12 characters"
+                autoComplete="username"
+                required
+                className={inputClass(!!errors.login_id)}
+              />
+              <FieldError message={errors.login_id} />
             </div>
 
             {/* Email */}
@@ -162,8 +219,9 @@ function Signup() {
                 placeholder="you@example.com"
                 autoComplete="email"
                 required
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10"
+                className={inputClass(!!errors.email)}
               />
+              <FieldError message={errors.email} />
             </div>
 
             {/* Password */}
@@ -229,9 +287,8 @@ function Signup() {
                 </button>
               </div>
 
-              <p className="mt-2 text-[11px] text-slate-400">
-                Use at least 8 characters with a mix of letters and numbers.
-              </p>
+              <FieldError message={errors.password} />
+              <PasswordChecklist password={password} />
             </div>
 
             {/* Confirm password */}
@@ -299,10 +356,10 @@ function Signup() {
                 </button>
               </div>
 
-              {confirmPassword && password !== confirmPassword && (
-                <p className="mt-2 text-xs font-medium text-red-500">
-                  Passwords do not match.
-                </p>
+              {confirmPassword && password !== confirmPassword ? (
+                <FieldError message="Passwords do not match" />
+              ) : (
+                <FieldError message={errors.confirm_password} />
               )}
             </div>
 
@@ -327,13 +384,15 @@ function Signup() {
                 .
               </span>
             </label>
+            <FieldError message={errors.terms} />
 
             {/* Signup button */}
             <button
               type="submit"
-              className="group mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:-translate-y-0.5 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20"
+              disabled={submitting}
+              className="group mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:-translate-y-0.5 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 disabled:opacity-60"
             >
-              Create account
+              {submitting ? "Creating account…" : "Create account"}
               <span className="transition-transform group-hover:translate-x-1">
                 →
               </span>
