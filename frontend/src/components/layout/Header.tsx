@@ -1,175 +1,122 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useTheme } from "../../context/ThemeContext";
 
-import { useAuth } from "../../context/auth";
-
-interface MenuItem {
-  label: string;
-  to?: string;
-  children?: { label: string; to: string }[];
+function MoonIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  );
 }
 
-const MENU: MenuItem[] = [
-  { label: "Dashboard", to: "/dashboard" },
-  {
-    label: "Operations",
-    children: [
-      { label: "Receipts", to: "/receipts" },
-      { label: "Deliveries", to: "/deliveries" },
-    ],
-  },
-  { label: "Stock", to: "/stock" },
-  {
-    label: "Settings",
-    children: [
-      { label: "Warehouses", to: "/settings/warehouses" },
-      { label: "Locations", to: "/settings/locations" },
-    ],
-  },
-];
+function SunIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="m4.93 4.93 1.41 1.41" />
+      <path d="m17.66 17.66 1.41 1.41" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="m6.34 17.66-1.41 1.41" />
+      <path d="m19.07 4.93-1.41 1.41" />
+    </svg>
+  );
+}
 
-const linkClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-lg px-3 py-2 text-sm font-medium transition ${
-    isActive ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-  }`;
+function SearchIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </svg>
+  );
+}
 
-export default function Header() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [lastPath, setLastPath] = useState(location.pathname);
-  const navRef = useRef<HTMLDivElement>(null);
+function Header() {
+  const { theme, toggleTheme } = useTheme();
 
-  if (lastPath !== location.pathname) {
-    setLastPath(location.pathname);
-    setOpenMenu(null);
-    setMobileOpen(false);
-  }
-
-  useEffect(() => {
-    const close = (event: MouseEvent) => {
-      if (!navRef.current?.contains(event.target as Node)) setOpenMenu(null);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, []);
-
-  const initials = (user?.name ?? "?")
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-  const isGroupActive = (item: MenuItem) => item.children?.some((child) => location.pathname.startsWith(child.to));
+  const isLightTheme = theme === "light";
 
   return (
-    <header ref={navRef} className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur print:hidden">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
-        <Link to="/dashboard" className="flex shrink-0 items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
-            S
-          </div>
-          <span className="text-base font-semibold text-slate-900">StockSense</span>
-        </Link>
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 transition-colors sm:px-6 dark:border-slate-800 dark:bg-slate-900">
+      <div className="relative hidden w-80 sm:block">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <SearchIcon />
+        </span>
 
-        <nav className="hidden flex-1 items-center gap-1 md:flex">
-          {MENU.map((item) =>
-            item.to ? (
-              <NavLink key={item.label} to={item.to} className={linkClass}>
-                {item.label}
-              </NavLink>
-            ) : (
-              <div key={item.label} className="relative">
-                <button
-                  type="button"
-                  aria-expanded={openMenu === item.label}
-                  onClick={() => setOpenMenu(openMenu === item.label ? null : item.label)}
-                  className={linkClass({ isActive: !!isGroupActive(item) })}
-                >
-                  {item.label} <span className="text-xs">▾</span>
-                </button>
-                {openMenu === item.label && (
-                  <div className="absolute left-0 mt-2 w-48 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-                    {item.children!.map((child) => (
-                      <NavLink key={child.to} to={child.to} className={(s) => `block ${linkClass(s)}`}>
-                        {child.label}
-                      </NavLink>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ),
-          )}
-        </nav>
-
-        <div className="relative ml-auto hidden md:block">
-          <button
-            type="button"
-            aria-label="Account menu"
-            aria-expanded={openMenu === "account"}
-            onClick={() => setOpenMenu(openMenu === "account" ? null : "account")}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white"
-          >
-            {initials}
-          </button>
-          {openMenu === "account" && (
-            <div className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
-              <div className="px-3 py-2">
-                <p className="text-sm font-semibold text-slate-900">{user?.name}</p>
-                <p className="text-xs text-slate-500">{user?.login_id}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  logout();
-                  navigate("/login");
-                }}
-                className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-rose-600 hover:bg-rose-50"
-              >
-                Log out
-              </button>
-            </div>
-          )}
-        </div>
-
-        <button
-          type="button"
-          aria-label="Open menu"
-          aria-expanded={mobileOpen}
-          onClick={() => setMobileOpen((open) => !open)}
-          className="ml-auto rounded-lg p-2 text-slate-600 hover:bg-slate-100 md:hidden"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-            <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
-          </svg>
-        </button>
+        <input
+          type="search"
+          placeholder="Search..."
+          aria-label="Search"
+          className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-400"
+        />
       </div>
 
-      {mobileOpen && (
-        <nav className="border-t border-slate-200 px-4 py-3 md:hidden">
-          {MENU.flatMap((item) => (item.to ? [{ label: item.label, to: item.to }] : item.children!)).map((link) => (
-            <NavLink key={link.to} to={link.to} className={(s) => `block ${linkClass(s)}`}>
-              {link.label}
-            </NavLink>
-          ))}
-          <div className="mt-2 flex items-center justify-between border-t border-slate-100 px-3 pt-3">
-            <span className="text-sm text-slate-600">{user?.name}</span>
-            <button
-              type="button"
-              onClick={() => {
-                logout();
-                navigate("/login");
-              }}
-              className="text-sm font-semibold text-rose-600"
-            >
-              Log out
-            </button>
+      {/* Keeps controls aligned right when search is hidden on mobile */}
+      <div className="ml-auto flex items-center gap-3">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={
+            isLightTheme ? "Switch to dark theme" : "Switch to light theme"
+          }
+          title={
+            isLightTheme ? "Switch to dark theme" : "Switch to light theme"
+          }
+          className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-500/15 dark:border-slate-700 dark:bg-slate-800 dark:text-amber-300 dark:hover:bg-slate-700"
+        >
+          {isLightTheme ? <MoonIcon /> : <SunIcon />}
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300">
+            A
           </div>
-        </nav>
-      )}
+
+          <div className="hidden sm:block">
+            <p className="text-sm font-semibold text-slate-800 dark:text-white">
+              Admin
+            </p>
+
+            <p className="text-xs text-slate-400">
+              Administrator
+            </p>
+          </div>
+        </div>
+      </div>
     </header>
   );
 }
+
+export default Header;
